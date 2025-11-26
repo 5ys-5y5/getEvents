@@ -1,0 +1,285 @@
+{
+  "meta": {
+    "lastUpdated": "2025-11-26T09:31:49.936Z",
+    "analystCount": 55,
+    "sourceLogDate": "2025-11-26T09:31:49.931Z",
+    "duration": "1ms"
+  },
+  "analysts": {
+    "David Williams": {
+      "analystName": "David Williams",
+      "analystCompany": "Williams Trading",
+      "priceTargetCount": 4
+    },
+    "Craig Ellis": {
+      "analystName": "Craig Ellis",
+      "analystCompany": "B.Riley Financial",
+      "priceTargetCount": 1
+    },
+    "Brian Kinstlinger": {
+      "analystName": "Brian Kinstlinger",
+      "analystCompany": "Industrial Alliance Securities",
+      "priceTargetCount": 1
+    },
+    "Quinn Bolton": {
+      "analystName": "Quinn Bolton",
+      "analystCompany": "Needham",
+      "priceTargetCount": 1
+    },
+    "Vijay Rakesh": {
+      "analystName": "Vijay Rakesh",
+      "analystCompany": "Mizuho Securities",
+      "priceTargetCount": 9
+    },
+    "Unknown": {
+      "analystName": "Unknown",
+      "analystCompany": "RBC Capital",
+      "priceTargetCount": 22
+    },
+    "William Stein": {
+      "analystName": "William Stein",
+      "analystCompany": "Truist Financial",
+      "priceTargetCount": 11
+    },
+    "Andres Sheppard": {
+      "analystName": "Andres Sheppard",
+      "analystCompany": "Cantor Fitzgerald",
+      "priceTargetCount": 5
+    },
+    "Dan Levy": {
+      "analystName": "Dan Levy",
+      "analystCompany": "Barclays",
+      "priceTargetCount": 12
+    },
+    "Stephen Gengaro": {
+      "analystName": "Stephen Gengaro",
+      "analystCompany": "Stifel Nicolaus",
+      "priceTargetCount": 4
+    },
+    "Joseph Spak": {
+      "analystName": "Joseph Spak",
+      "analystCompany": "UBS",
+      "priceTargetCount": 10
+    },
+    "Edison Yu": {
+      "analystName": "Edison Yu",
+      "analystCompany": "Deutsche Bank",
+      "priceTargetCount": 1
+    },
+    "Daniel Ives": {
+      "analystName": "Daniel Ives",
+      "analystCompany": "Wedbush",
+      "priceTargetCount": 10
+    },
+    "Adam Jonas": {
+      "analystName": "Adam Jonas",
+      "analystCompany": "Morgan Stanley",
+      "priceTargetCount": 17
+    },
+    "Mark Delaney": {
+      "analystName": "Mark Delaney",
+      "analystCompany": "UBS",
+      "priceTargetCount": 12
+    },
+    "Dan Ives": {
+      "analystName": "Dan Ives",
+      "analystCompany": "Wedbush",
+      "priceTargetCount": 6
+    },
+    "Alexander Potter": {
+      "analystName": "Alexander Potter",
+      "analystCompany": "Piper Sandler",
+      "priceTargetCount": 12
+    },
+    "William Selesky": {
+      "analystName": "William Selesky",
+      "analystCompany": "Argus Research",
+      "priceTargetCount": 1
+    },
+    "Stuart Pearson": {
+      "analystName": "Stuart Pearson",
+      "analystCompany": "BNP Paribas",
+      "priceTargetCount": 2
+    },
+    "Chris McNally": {
+      "analystName": "Chris McNally",
+      "analystCompany": "Evercore ISI",
+      "priceTargetCount": 6
+    },
+    "George Gianarikas": {
+      "analystName": "George Gianarikas",
+      "analystCompany": "Canaccord Genuity",
+      "priceTargetCount": 6
+    },
+    "Tom Narayan": {
+      "analystName": "Tom Narayan",
+      "analystCompany": "RBC Capital",
+      "priceTargetCount": 11
+    },
+    "Terry Lee": {
+      "analystName": "Terry Lee",
+      "analystCompany": "KGI Securities",
+      "priceTargetCount": 1
+    },
+    "Philippe Houchois": {
+      "analystName": "Philippe Houchois",
+      "analystCompany": "Jefferies",
+      "priceTargetCount": 5
+    },
+    "Justin Post": {
+      "analystName": "Justin Post",
+      "analystCompany": "Bank of America Securities",
+      "priceTargetCount": 1
+    },
+    "Michael Tyndall": {
+      "analystName": "Michael Tyndall",
+      "analystCompany": "HSBC",
+      "priceTargetCount": 4
+    },
+    "John Murphy": {
+      "analystName": "John Murphy",
+      "analystCompany": "Bank of America Securities",
+      "priceTargetCount": 1
+    },
+    "Ed Yu": {
+      "analystName": "Ed Yu",
+      "analystCompany": "Deutsche Bank",
+      "priceTargetCount": 1
+    },
+    "Aaron Rakers": {
+      "analystName": "Aaron Rakers",
+      "analystCompany": "Wells Fargo",
+      "priceTargetCount": 1
+    },
+    "Bill Selesky": {
+      "analystName": "Bill Selesky",
+      "analystCompany": "Argus Research",
+      "priceTargetCount": 2
+    },
+    "Ronald Jewsikow": {
+      "analystName": "Ronald Jewsikow",
+      "analystCompany": "Guggenheim",
+      "priceTargetCount": 2
+    },
+    "Pierre Ferragu": {
+      "analystName": "Pierre Ferragu",
+      "analystCompany": "New Street",
+      "priceTargetCount": 3
+    },
+    "Itay Michaeli": {
+      "analystName": "Itay Michaeli",
+      "analystCompany": "Citigroup",
+      "priceTargetCount": 3
+    },
+    "Laura Martin": {
+      "analystName": "Laura Martin",
+      "analystCompany": "Needham",
+      "priceTargetCount": 1
+    },
+    "Emmanuel Rosner": {
+      "analystName": "Emmanuel Rosner",
+      "analystCompany": "Deutsche Bank",
+      "priceTargetCount": 10
+    },
+    "Colin Langan": {
+      "analystName": "Colin Langan",
+      "analystCompany": "Wells Fargo",
+      "priceTargetCount": 8
+    },
+    "Ben Kallo": {
+      "analystName": "Ben Kallo",
+      "analystCompany": "Robert W. Baird",
+      "priceTargetCount": 4
+    },
+    "Toni Sacconaghi": {
+      "analystName": "Toni Sacconaghi",
+      "analystCompany": "Bernstein",
+      "priceTargetCount": 2
+    },
+    "Garrett Nelson": {
+      "analystName": "Garrett Nelson",
+      "analystCompany": "CFRA",
+      "priceTargetCount": 4
+    },
+    "Jairam Nathan": {
+      "analystName": "Jairam Nathan",
+      "analystCompany": "Daiwa",
+      "priceTargetCount": 2
+    },
+    "Craig Irwin": {
+      "analystName": "Craig Irwin",
+      "analystCompany": "Roth Capital",
+      "priceTargetCount": 1
+    },
+    "Alex Potter": {
+      "analystName": "Alex Potter",
+      "analystCompany": "Piper Sandler",
+      "priceTargetCount": 1
+    },
+    "Rod Lache": {
+      "analystName": "Rod Lache",
+      "analystCompany": "Wolfe Research",
+      "priceTargetCount": 2
+    },
+    "Canaccord Canaccord": {
+      "analystName": "Canaccord Canaccord",
+      "analystCompany": "Canaccord Genuity",
+      "priceTargetCount": 1
+    },
+    "Colin Rusch": {
+      "analystName": "Colin Rusch",
+      "analystCompany": "Oppenheimer",
+      "priceTargetCount": 4
+    },
+    "Patrick Hummel": {
+      "analystName": "Patrick Hummel",
+      "analystCompany": "UBS",
+      "priceTargetCount": 2
+    },
+    "Jeff Osborne": {
+      "analystName": "Jeff Osborne",
+      "analystCompany": "Cowen & Co.",
+      "priceTargetCount": 1
+    },
+    "Ryan Brinkman": {
+      "analystName": "Ryan Brinkman",
+      "analystCompany": "J.P. Morgan",
+      "priceTargetCount": 1
+    },
+    "Emmanuel Rosner Rosner": {
+      "analystName": "Emmanuel Rosner Rosner",
+      "analystCompany": "Deutsche Bank",
+      "priceTargetCount": 1
+    },
+    "Brian Johnson": {
+      "analystName": "Brian Johnson",
+      "analystCompany": "Barclays",
+      "priceTargetCount": 1
+    },
+    "Dan Inves": {
+      "analystName": "Dan Inves",
+      "analystCompany": "Wedbush",
+      "priceTargetCount": 1
+    },
+    "Adrian Yanoshik": {
+      "analystName": "Adrian Yanoshik",
+      "analystCompany": "Berenberg Bank",
+      "priceTargetCount": 1
+    },
+    "Trip Chowdhry": {
+      "analystName": "Trip Chowdhry",
+      "analystCompany": "Atlantic Equities",
+      "priceTargetCount": 1
+    },
+    "Jed Dorsheimer": {
+      "analystName": "Jed Dorsheimer",
+      "analystCompany": "Canaccord Genuity",
+      "priceTargetCount": 1
+    },
+    "Matthew Portillo": {
+      "analystName": "Matthew Portillo",
+      "analystCompany": "Tudor Pickering",
+      "priceTargetCount": 1
+    }
+  }
+}

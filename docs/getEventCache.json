@@ -1,0 +1,251 @@
+{
+  "meta": {
+    "type": "meta",
+    "request": {
+      "startDate": 3,
+      "endDate": 7,
+      "fromDate": "2025-11-29",
+      "toDate": "2025-12-03"
+    },
+    "response": {
+      "eventCount": 46,
+      "duration": "608ms",
+      "timestamp": "2025-11-26T02:37:07.398Z"
+    },
+    "collectionErrorChecklist": {
+      "status": []
+    }
+  },
+  "events": [
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CRDO",
+      "date": "2025-12-01"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "FRGT",
+      "date": "2025-12-01"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "MDB",
+      "date": "2025-12-01"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "VSTS",
+      "date": "2025-12-01"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "SLP",
+      "date": "2025-12-01"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "NOTV",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CTRN",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CRWD",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "UNFI",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "ASAN",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "OKTA",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "MRVL",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "ALTS",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "AEO",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "PSTG",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "GTLB",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CNM",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "LESL",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "NTRB",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "VLGEA",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "PLCE",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "BOX",
+      "date": "2025-12-02"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "NCNO",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "THO",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "PVH",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CULP",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "SNOW",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "FIVE",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "AI",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "UEC",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "AVAV",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "SRDX",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "M",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "DLHC",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CRM",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "VRNT",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "DLTR",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "HQY",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "TLYS",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CURV",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "DAKT",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "PATH",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "SGU",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "GWRE",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "CXM",
+      "date": "2025-12-03"
+    },
+    {
+      "source": "fmp-earnings-calendar",
+      "ticker": "ROLR",
+      "date": "2025-12-03"
+    }
+  ]
+}

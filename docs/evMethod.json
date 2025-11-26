@@ -1,0 +1,499 @@
+{
+    "aggregations": {
+        "description": "주요 밸류에이션 지표 계산식 정의 (ApiList.json 기준, TTM 엔드포인트 미사용)",
+        "ttmFromQuarterSumOrScaled": {
+            "id": "ttmFromQuarterSumOrScaled",
+            "description": "income-statement quarter&limit=4 응답을 1년치(TTM)로 변환. 값이 4개면 합계, 4개 미만이면 평균 * 4",
+            "input": "number[]",
+            "formula": "n = len(values); if n == 0 then null; if n == 4 then sum(values); else (sum(values) / n) * 4"
+        },
+        "avgFromQuarter": {
+            "id": "avgFromQuarter",
+            "description": "balance-sheet quarter&limit=4 응답 평균 (ROE 등에서 자기자본 평균값 사용)",
+            "input": "number[]",
+            "formula": "n = len(values); if n == 0 then null; else sum(values) / n"
+        },
+        "lastFromQuarter": {
+            "id": "lastFromQuarter",
+            "description": "quarter&limit=4 응답 중 가장 최근 분기값 사용 (배열의 첫 번째 원소)",
+            "input": "number[]",
+            "formula": "if len(values) == 0 then null; else values[0]"
+        },
+        "avgConsensus": {
+            "id": "avgConsensus",
+            "description": "애널리스트 리포트별 adjPriceTarget의 단순 평균",
+            "input": "number[]",
+            "formula": "n = len(values); if n == 0 then null; else sum(values) / n"
+        },
+        "yoyFromQuarter": {
+            "id": "yoyFromQuarter",
+            "description": "quarter&limit=4 응답에서 전년동기 대비 성장률 계산. values[0] / values[3] - 1",
+            "input": "number[]",
+            "formula": "n = len(values); if n < 4 then null; base = values[3]; if base == 0 then null; else (values[0] - base) / base"
+        },
+        "qoqFromQuarter": {
+            "id": "qoqFromQuarter",
+            "description": "quarter&limit=4 응답에서 직전 분기 대비 성장률 계산. values[0] / values[1] - 1",
+            "input": "number[]",
+            "formula": "n = len(values); if n < 2 then null; base = values[1]; if base == 0 then null; else (values[0] - base) / base"
+        },
+        "ratingAnalyst": {
+            "id": "ratingAnalyst",
+            "description": "애널리스트별 priceTarget의 D+N 괴리율 평균과 표준편차, [D+N 괴리율 = getLastPrice(symbol, publishedDate + N).close / priceTarget]. 각 (symbol, publishedDate+N) 조합마다 fmp-historical-price-eod API를 개별 호출하여 해당 날짜의 EOD 가격을 조회한다. 14개의 D+N horizon 지점(0,1,2,3,4,5,6,7,14,21,30,60,180,365)마다 개별 API 호출을 수행한다.",
+            "input": "PriceTargetRecord[]",
+            "formula": "ratingAnalyst(values, horizons=[0,1,2,3,4,5,6,7,14,21,30,60,180,365])"
+        },
+        "consensusWithAnalystRating": {
+            "id": "consensusWithAnalystRating",
+            "description": "getEachPriceTargetConsensus 결과의 각 항목에 analystName 기준 ratingAnalyst(D+N 평균 괴리율 및 편차)를 병합",
+            "input": "PriceTargetRecord[]",
+            "formula": "consensusWithAnalystRating(values)"
+        }
+    },
+    "metrics": {
+        "description": "주요 밸류에이션 지표 계산식 정의 (ApiList.json 기준)",
+        "getQuantitiveValuation": {
+            "CurrentPrice": {
+                "id": "current-price",
+                "displayName": "Current Price",
+                "description": "현재가 - 정규장에는 quote API, 프리/포스트 마켓에는 pre-post-market API 사용",
+                "formula": "getCurrentPriceByMarketHours(ticker)",
+                "variables": {
+                    "quotePrice": {
+                        "serviceId": "fmp-quote",
+                        "field": "price"
+                    },
+                    "prePostPrice": {
+                        "serviceId": "fmp-aftermarket-trade",
+                        "field": "price"
+                    }
+                }
+            },
+
+            "PBR": {
+                "id": "valuation-pbr",
+                "displayName": "PBR (Price to Book Ratio)",
+                "formula": "marketCap / totalStockholdersEquity",
+                "variables": {
+                    "marketCap": {
+                        "serviceId": "fmp-quote",
+                        "field": "marketCap"
+                    },
+                    "totalStockholdersEquity": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalStockholdersEquity",
+                        "aggregationId": "lastFromQuarter"
+                    }
+                }
+            },
+
+            "PSR": {
+                "id": "valuation-psr",
+                "displayName": "PSR (Price to Sales Ratio)",
+                "formula": "marketCap / revenueTTM",
+                "variables": {
+                    "marketCap": {
+                        "serviceId": "fmp-quote",
+                        "field": "marketCap"
+                    },
+                    "revenueTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "PER": {
+                "id": "valuation-per",
+                "displayName": "PER (Price to Earnings Ratio)",
+                "formula": "marketCap / netIncomeTTM",
+                "variables": {
+                    "marketCap": {
+                        "serviceId": "fmp-quote",
+                        "field": "marketCap"
+                    },
+                    "netIncomeTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "netIncome",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "ROE": {
+                "id": "profitability-roe",
+                "displayName": "ROE (Return on Equity)",
+                "formula": "netIncomeTTM / equityAvg",
+                "variables": {
+                    "netIncomeTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "netIncome",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    },
+                    "equityAvg": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalStockholdersEquity",
+                        "aggregationId": "avgFromQuarter"
+                    }
+                }
+            },
+
+            "EV_EBITDA": {
+                "id": "valuation-ev-ebitda",
+                "displayName": "EV/EBITDA",
+                "formula": "enterpriseValue / ebitdaTTM",
+                "variables": {
+                    "enterpriseValue": {
+                        "expression": "marketCap + totalDebtLatest - cashAndCashEquivalentsLatest",
+                        "dependencies": ["marketCap", "totalDebtLatest", "cashAndCashEquivalentsLatest"]
+                    },
+                    "marketCap": {
+                        "serviceId": "fmp-quote",
+                        "field": "marketCap"
+                    },
+                    "totalDebtLatest": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalDebt",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "cashAndCashEquivalentsLatest": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "cashAndCashEquivalents",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "ebitdaTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "ebitda",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "RunwayYears": {
+                "id": "risk-runway-years",
+                "displayName": "Runway (years until cash 0)",
+                "description": "현금 및 단기투자자산 / |영업이익(TTM)|. 영업이익이 플러스면 null 반환.",
+                "formula": "if operatingIncomeTTM >= 0 then null else cashAndShortTermInvestmentsLast / abs(operatingIncomeTTM)",
+                "variables": {
+                    "cashAndShortTermInvestmentsLast": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "cashAndShortTermInvestments",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "operatingIncomeTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "operatingIncome",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "CurrentRatio": {
+                "id": "risk-current-ratio",
+                "displayName": "Current Ratio",
+                "description": "유동비율 = 유동자산 / 유동부채",
+                "formula": "totalCurrentAssetsLast / totalCurrentLiabilitiesLast",
+                "variables": {
+                    "totalCurrentAssetsLast": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalCurrentAssets",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "totalCurrentLiabilitiesLast": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalCurrentLiabilities",
+                        "aggregationId": "lastFromQuarter"
+                    }
+                }
+            },
+
+            "CashToRevenueTTM": {
+                "id": "risk-cash-to-revenue-ttm",
+                "displayName": "Cash & STI / Revenue (TTM)",
+                "description": "현금 및 단기투자자산이 TTM 매출의 몇 배인지",
+                "formula": "cashAndShortTermInvestmentsLast / revenueTTM",
+                "variables": {
+                    "cashAndShortTermInvestmentsLast": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "cashAndShortTermInvestments",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "revenueTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "RevenueYoY": {
+                "id": "momentum-revenue-yoy",
+                "displayName": "Revenue YoY Growth (Last Quarter)",
+                "description": "최근 분기 매출의 전년 동기 대비 성장률",
+                "formula": "revenueYoY",
+                "variables": {
+                    "revenueYoY": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "yoyFromQuarter"
+                    }
+                }
+            },
+
+            "RevenueQoQ": {
+                "id": "momentum-revenue-qoq",
+                "displayName": "Revenue QoQ Growth (Last Quarter)",
+                "description": "최근 분기 매출의 직전 분기 대비 성장률",
+                "formula": "revenueQoQ",
+                "variables": {
+                    "revenueQoQ": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "qoqFromQuarter"
+                    }
+                }
+            },
+
+            "GrossMarginLastQuarter": {
+                "id": "momentum-gross-margin-last",
+                "displayName": "Gross Margin (Last Quarter)",
+                "description": "최근 분기 매출총이익률 = grossProfit / revenue",
+                "formula": "grossProfitLast / revenueLast",
+                "variables": {
+                    "grossProfitLast": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "grossProfit",
+                        "aggregationId": "lastFromQuarter"
+                    },
+                    "revenueLast": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "lastFromQuarter"
+                    }
+                }
+            },
+
+            "GrossMarginTTM": {
+                "id": "momentum-gross-margin-ttm",
+                "displayName": "Gross Margin (TTM)",
+                "description": "TTM 매출총이익률 = grossProfitTTM / revenueTTM",
+                "formula": "grossProfitTTM / revenueTTM",
+                "variables": {
+                    "grossProfitTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "grossProfit",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    },
+                    "revenueTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "RNDIntensityTTM": {
+                "id": "momentum-rnd-intensity-ttm",
+                "displayName": "R&D Intensity (R&D / Revenue, TTM)",
+                "description": "기술 투자 비율 = R&D 비용(TTM) / 매출(TTM)",
+                "formula": "rndTTM / revenueTTM",
+                "variables": {
+                    "rndTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "researchAndDevelopmentExpenses",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    },
+                    "revenueTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "OperatingMarginTTM": {
+                "id": "momentum-operating-margin-ttm",
+                "displayName": "Operating Margin (TTM)",
+                "description": "TTM 영업이익률 = operatingIncomeTTM / revenueTTM",
+                "formula": "operatingIncomeTTM / revenueTTM",
+                "variables": {
+                    "operatingIncomeTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "operatingIncome",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    },
+                    "revenueTTM": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "revenue",
+                        "aggregationId": "ttmFromQuarterSumOrScaled"
+                    }
+                }
+            },
+
+            "SharesDilutionYoY": {
+                "id": "dilution-shares-yoy",
+                "displayName": "Shares Dilution YoY",
+                "description": "전년 동기 대비 발행주식수 증가율 (weightedAverageShsOut 기준)",
+                "formula": "sharesYoY",
+                "variables": {
+                    "sharesYoY": {
+                        "serviceId": "fmp-income-statement",
+                        "field": "weightedAverageShsOut",
+                        "aggregationId": "yoyFromQuarter"
+                    }
+                }
+            },
+
+            "DebtToEquityAvg": {
+                "id": "dilution-debt-to-equity-avg",
+                "displayName": "Debt to Equity (Average of Last 4Q)",
+                "description": "평균 부채비율 = 평균 총부채 / 평균 자기자본",
+                "formula": "avgTotalDebt / avgTotalEquity",
+                "variables": {
+                    "avgTotalDebt": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalDebt",
+                        "aggregationId": "avgFromQuarter"
+                    },
+                    "avgTotalEquity": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalStockholdersEquity",
+                        "aggregationId": "avgFromQuarter"
+                    }
+                }
+            },
+
+            "OtherNonCurrentLiabilitiesToEquityAvg": {
+                "id": "dilution-otherncl-to-equity-avg",
+                "displayName": "Other Non-current Liabilities / Equity (Avg)",
+                "description": "기타 비유동부채 / 자기자본 (최근 4분기 평균)",
+                "formula": "avgOtherNCL / avgTotalEquity",
+                "variables": {
+                    "avgOtherNCL": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "otherNonCurrentLiabilities",
+                        "aggregationId": "avgFromQuarter"
+                    },
+                    "avgTotalEquity": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalStockholdersEquity",
+                        "aggregationId": "avgFromQuarter"
+                    }
+                }
+            },
+
+            "NetDebtToEquityAvg": {
+                "id": "dilution-netdebt-to-equity-avg",
+                "displayName": "Net Debt / Equity (Avg)",
+                "description": "순부채 / 자기자본 (최근 4분기 평균)",
+                "formula": "avgNetDebt / avgTotalEquity",
+                "variables": {
+                    "avgNetDebt": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "netDebt",
+                        "aggregationId": "avgFromQuarter"
+                    },
+                    "avgTotalEquity": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "totalStockholdersEquity",
+                        "aggregationId": "avgFromQuarter"
+                    }
+                }
+            },
+
+            "APICYoY": {
+                "id": "dilution-apic-yoy",
+                "displayName": "Additional Paid-in Capital YoY",
+                "description": "추가납입자본(APIC)의 전년 동기 대비 증가율 (증자/스톡옵션 행사 히스토리 근사). balance-sheet-statement.fieldMap에 additionalPaidInCapital 필드가 매핑돼 있어야 함.",
+                "formula": "apicYoY",
+                "variables": {
+                    "apicYoY": {
+                        "serviceId": "balance-sheet-statement",
+                        "field": "additionalPaidInCapital",
+                        "aggregationId": "yoyFromQuarter"
+                    }
+                }
+            }
+        },
+
+        "getQualativeValuation": {
+            "ConsensusTargetPrice": {
+                "id": "consensus-target-price",
+                "displayName": "Consensus Target Price",
+                "description": "애널리스트 목표가 컨센서스 (targetConsensus, targetHigh, targetLow, targetMedian)",
+                "formula": "getPriceTargetConsensus API 응답값",
+                "variables": {
+                    "targetConsensus": {
+                        "serviceId": "fmp-price-target-consensus",
+                        "field": "targetConsensus"
+                    },
+                    "targetHigh": {
+                        "serviceId": "fmp-price-target-consensus",
+                        "field": "targetHigh"
+                    },
+                    "targetLow": {
+                        "serviceId": "fmp-price-target-consensus",
+                        "field": "targetLow"
+                    },
+                    "targetMedian": {
+                        "serviceId": "fmp-price-target-consensus",
+                        "field": "targetMedian"
+                    }
+                }
+            },
+            "PriceTargetSummary": {
+                "id": "price-target-summary",
+                "displayName": "Price Target Summary",
+                "description": "목표가 요약 통계 (lastMonth/Quarter/Year/AllTime 카운트 및 평균)",
+                "formula": "getEachPriceTargetConsensusSummary API 응답값",
+                "variables": {
+                    "summary": {
+                        "serviceId": "fmp-price-target-summary",
+                        "field": "*"
+                    }
+                }
+            },
+            "AnalystLog": {
+                "id": "analyst-log",
+                "displayName": "Analyst Log Cache",
+                "description": "모든 티커의 애널리스트 데이터를 analystLog.json에 캐싱. 매일 자정 자동 갱신 또는 /refreshAnalystLog 엔드포인트로 수동 갱신.",
+                "formula": "getEachPriceTargetConsensus API 전체 티커 대상 호출",
+                "variables": {
+                    "analystData": {
+                        "serviceId": "fmp-price-target",
+                        "aggregation": "all-tickers-from-symbol-cache"
+                    }
+                }
+            },
+            "AnalystRating": {
+                "id": "analyst-rating",
+                "displayName": "Analyst Rating (D+N Gap)",
+                "description": "analystLog.json에서 unique 애널리스트 추출 후 D+N 괴리율 계산 (14개 horizon: 0,1,2,3,4,5,6,7,14,21,30,60,180,365)",
+                "formula": "ratingAnalyst(analystPriceTargets, horizons=[0,1,2,3,4,5,6,7,14,21,30,60,180,365])",
+                "variables": {
+                    "analystPriceTargets": {
+                        "source": "analystLog.json",
+                        "aggregationId": "ratingAnalyst"
+                    }
+                }
+            },
+            "PeerQuantitative": {
+                "id": "peer-quantitative",
+                "displayName": "Peer Quantitative Metrics (Average)",
+                "description": "동종 업계 티커들의 quantitative 지표 평균값. peer.getPeerTicker API로 peer 목록 조회 후 각 peer의 valuation 계산하여 평균.",
+                "formula": "avg(quantitativeMetrics(peerTickers))",
+                "variables": {
+                    "peerTickers": {
+                        "serviceId": "stock_peers",
+                        "field": "peersList"
+                    },
+                    "peerMetrics": {
+                        "aggregation": "average-of-quantitative-valuations"
+                    }
+                }
+            }
+
+        }
+    }
+}

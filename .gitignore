@@ -11,12 +11,6 @@ coverage/
 .env.local
 .env.*.local
 
-# Runtime cache files (allow config/ but ignore generated caches)
-docs/symbolCache.json
-docs/eventCache.json
-docs/**/*.json
-!docs/config/**/*.json
-
 # Logs
 *.log
 npm-debug.log*

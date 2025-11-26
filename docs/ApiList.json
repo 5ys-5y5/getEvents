@@ -1,0 +1,326 @@
+{
+  "filter": {
+    "target": {
+      "service-FMP": {
+        "id": "fmp-company-screener",
+        "API": "https://financialmodelingprep.com/api/v3/stock-screener?country=US&exchange=NYSE,NASDAQ,AMEX&isEtf=false&isFund=false&isActivelyTrading=true&limit=30000&apikey={fmpApiKey}",
+        "fieldMap": {
+            "ticker": "symbol",
+            "sector": "sector",
+            "industry": "industry"
+        }
+      }
+    }
+  },
+  "getEvent":{
+    "earningCalendar":{
+      "service-FMP": {
+        "id": "fmp-earnings-calendar",
+        "API":"https://financialmodelingprep.com/api/v3/earning_calendar?from={fromDate}&to={toDate}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "date": "date"
+        }
+      }
+    }
+  },
+
+
+  "getQuantitiveValuation":{
+    "getCurrentPrice":{
+      "service-FMP": {
+        "id": "fmp-aftermarket-trade",
+        "API":"https://financialmodelingprep.com/api/v4/pre-post-market-trade/{ticker}?apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "price": "price",
+          "UTCtimestamp": "timestamp"
+        }
+      }
+    },
+    "getLastPrice":{
+      "service-FMP": {
+        "id": "fmp-historical-price-eod",
+        "API":"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?from={fromDate}&to={toDate}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "date": "date",
+          "open": "open",
+          "high": "high",
+          "low": "low",
+          "close": "close",
+          "volume": "volume",
+          "change": "change",
+          "changePercent": "changePercent",
+          "vwap": "vwap"
+        }
+      }
+    },
+    "marketCap":{
+      "service-FMP": {
+        "id": "fmp-quote",
+        "API":"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "price": "price",
+          "marketCap": "marketCap",
+          "UTCtimestamp": "timestamp"
+        }
+      }
+    },
+    "getIncomeStatement":{
+      "service-FMP": {
+        "id": "fmp-income-statement",
+        "API":"https://financialmodelingprep.com/api/v3/income-statement/{ticker}?period=quarter&limit=4&apikey={fmpApiKey}",
+        "fieldMap": {
+          "date": "date",
+          "ticker": "symbol",
+          "filingDate": "filingDate",
+          "acceptedDate": "acceptedDate",
+
+          "revenue": "revenue",
+          "ebitda": "ebitda",
+          "grossProfit": "grossProfit",
+          "researchAndDevelopmentExpenses": "researchAndDevelopmentExpenses",
+          "operatingExpenses": "operatingExpenses",
+          "operatingIncome": "operatingIncome",
+          "nonOperatingIncomeExcludingInterest": "nonOperatingIncomeExcludingInterest",
+          "totalOtherIncomeExpensesNet": "totalOtherIncomeExpensesNet",
+          "netIncome": "netIncome",
+          "eps": "eps",
+          "weightedAverageShsOut": "weightedAverageShsOut"
+        }
+      }
+    },
+    "getBalanceSheetStatement":{
+      "service-FMP": {
+        "id": "balance-sheet-statement",
+        "API":"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{ticker}?period=quarter&limit=4&apikey={fmpApiKey}",
+        "fieldMap": {
+          "date": "date",
+          "ticker": "symbol",
+          "filingDate": "filingDate",
+          "acceptedDate": "acceptedDate",
+
+          "cashAndCashEquivalents": "cashAndCashEquivalents",
+          "shortTermInvestments": "shortTermInvestments",
+          "cashAndShortTermInvestments": "cashAndShortTermInvestments",
+          "totalCurrentAssets": "totalCurrentAssets",
+          "totalCurrentLiabilities": "totalCurrentLiabilities",
+          "totalDebt": "totalDebt",
+          "netDebt": "netDebt",
+          "totalLiabilities": "totalLiabilities",
+          "totalStockholdersEquity": "totalStockholdersEquity",
+          "otherNonCurrentLiabilities": "otherNonCurrentLiabilities",
+          "retainedEarnings": "retainedEarnings"
+        }
+      }
+    },
+    "getAnalystEstimates":{
+      "service-FMP": {
+        "id": "analyst-estimates",
+        "API":"https://financialmodelingprep.com/stable/analyst-estimates?symbol={ticker}&period=quarter&page=0&limit=8&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "date": "date",
+          "revenueLow": "revenueLow",
+          "revenueHigh": "revenueHigh",
+          "revenueAvg": "revenueAvg",
+          "ebitdaLow": "ebitdaLow",
+          "ebitdaHigh": "ebitdaHigh",
+          "ebitdaAvg": "ebitdaAvg",
+          "ebitLow": "ebitLow",
+          "ebitHigh": "ebitHigh",
+          "ebitAvg": "ebitAvg",
+          "netIncomeLow": "netIncomeLow",
+          "netIncomeHigh": "netIncomeHigh",
+          "netIncomeAvg": "netIncomeAvg",
+          "sgaExpenseLow": "sgaExpenseLow",
+          "sgaExpenseHigh": "sgaExpenseHigh",
+          "sgaExpenseAvg": "sgaExpenseAvg",
+          "epsAvg": "epsAvg",
+          "epsHigh": "epsHigh",
+          "epsLow": "epsLow",
+          "numAnalystsRevenue": "numAnalystsRevenue",
+          "numAnalystsEps": "numAnalystsEps"
+        }
+      }
+    }
+  },
+  "getQualativeValuation":{
+    "getEachPriceTargetConsensus":{
+      "service-FMP": {
+        "id": "fmp-price-target",
+        "API":"https://financialmodelingprep.com/api/v4/price-target?symbol={ticker}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "publishedDate": "publishedDate",
+          "newsURL": "newsURL",
+          "newsTitle": "newsTitle",
+          "analystName": "analystName",
+          "priceTarget": "priceTarget",
+          "adjPriceTarget": "adjPriceTarget",
+          "priceWhenPosted": "priceWhenPosted",
+          "newsPublisher": "newsPublisher",
+          "newsBaseURL": "newsBaseURL",
+          "analystCompany": "analystCompany"
+        }
+      }
+    },
+    "getEachPriceTargetConsensusLatest":{
+      "service-FMP": {
+        "id": "fmp-price-target-latest-news",
+        "API":"https://financialmodelingprep.com/stable/price-target-latest-news?page=0&limit=100&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "publishedDate": "publishedDate",
+          "newsURL": "newsURL",
+          "newsTitle": "newsTitle",
+          "analystName": "analystName",
+          "priceTarget": "priceTarget",
+          "adjPriceTarget": "adjPriceTarget",
+          "priceWhenPosted": "priceWhenPosted",
+          "newsPublisher": "newsPublisher",
+          "newsBaseURL": "newsBaseURL",
+          "analystCompany": "analystCompany"
+        }
+      }
+    },
+    "getEachGradingConsensus":{
+      "service-FMP": {
+        "id": "fmp-grades",
+        "API":"https://financialmodelingprep.com/api/v3/grade/{ticker}?apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "date": "date",
+          "analystCompany": "gradingCompany",
+          "previousGrade": "previousGrade",
+          "newGrade": "newGrade",
+          "action": "action"
+        }
+      }
+    },
+    "getEachGradingConsensusLatestChanged":{
+      "service-FMP": {
+        "id": "fmp-grades-latest-news",
+        "API":"https://financialmodelingprep.com/api/v4/upgrades-downgrades-grading-company?company={ticker}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "publishedDate": "publishedDate",
+          "newsURL": "newsURL",
+          "newsTitle": "newsTitle",
+          "newsBaseURL": "newsBaseURL",
+          "newsPublisher": "newsPublisher",
+          "newGrade": "newGrade",
+          "previousGrade": "previousGrade",
+          "gradingCompany": "gradingCompany",
+          "action": "action",
+          "priceWhenPosted": "priceWhenPosted"
+        }
+      }
+    },
+    "getEachPriceTargetConsensusSummary":{
+      "service-FMP": {
+        "id": "fmp-price-target-summary",
+        "API":"https://financialmodelingprep.com/stable/price-target-summary?symbol={ticker}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "lastMonthCount": "lastMonthCount",
+          "lastMonthAvgPriceTarget": "lastMonthAvgPriceTarget",
+          "lastQuarterCount": "lastQuarterCount",
+          "lastQuarterAvgPriceTarget": "lastQuarterAvgPriceTarget",
+          "lastYearCount": "lastYearCount",
+          "lastYearAvgPriceTarget": "lastYearAvgPriceTarget",
+          "allTimeCount": "allTimeCount",
+          "allTimeAvgPriceTarget": "allTimeAvgPriceTarget",
+          "publishers": "publishers"
+        }
+      }
+    },
+    "getPriceTargetConsensus":{
+      "service-FMP": {
+        "id": "fmp-price-target-consensus",
+        "API":"https://financialmodelingprep.com/stable/price-target-consensus?symbol={ticker}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "targetHigh": "targetHigh",
+          "targetLow": "targetLow",
+          "targetConsensus": "targetConsensus",
+          "targetMedian": "targetMedian"
+        }
+      }
+    },
+    "analystRating":{
+      "service-FMP": {
+        "id": "fmp-price-target-analyst-name",
+        "API":"https://financialmodelingprep.com/api/v4/price-target-analyst-name?name={ANALYST_NAME}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "publishedDate": "publishedDate",
+          "newsURL": "newsURL",
+          "newsTitle": "newsTitle",
+          "analystName": "analystName",
+          "priceTarget": "priceTarget",
+          "adjPriceTarget": "adjPriceTarget",
+          "priceWhenPosted": "priceWhenPosted",
+          "newsPublisher": "newsPublisher",
+          "newsBaseURL": "newsBaseURL",
+          "analystCompany": "analystCompany"
+        }
+      }
+    }
+  },
+
+  "peer": {
+    "getPeerTicker":{
+      "service-FMP": {
+        "id": "stock_peers",
+        "API":"https://financialmodelingprep.com/api/v4/stock_peers?symbol={ticker}&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "peersList": {
+            "type": "string",
+            "value": "peersList"
+          }
+        }
+      }
+    }    
+  },
+
+  "news":{
+    "stockLatest":{
+      "service-FMP": {
+        "id": "stock_peers",
+        "API": "https://financialmodelingprep.com/stable/news/stock-latest?limit=1000&apikey={fmpApiKey}",
+        "fieldMap": {
+          "ticker": "symbol",
+          "publishedDate": "publishedDate",
+          "publisher": "publisher",
+          "title": "title",
+          "image": "image",
+          "site": "site",
+          "text": "text",
+          "url": "url"
+        }
+      }
+    }
+  },
+
+
+  "function":{
+    "Description": "어떤 기능에서 필요한 API들인지 그루핑하는 기준이 됩니다.",
+    "information":{
+      "Description": "어떤 기능에서 어떤 정보를 얻기 위해 필요한 API들인지 그루핑하는 기준이 됩니다.",
+      "service": {
+        "Description": "정보를 얻을 수 있는 서비스의 엔드포인트(API)를 기록하며, 응답키를 어떤 정보에 매칭(fieldMap)해야 하는지 정보를 내포합니다.",
+        "id": "provider-resource-id 예: fmp-company-screener",
+        "API":"",
+        "fieldMap": {
+            "Description": "function에서 정의된 변수명은 key열에, API에서 명명된 응답키는 value열에 기록하여 값이 서로 매칭되게 합니다.",
+            "SystemParameter1": "APIResponseKey1",
+            "SystemParameter2": "APIResponseKey2"
+        }
+      }
+    }
+  }
+}

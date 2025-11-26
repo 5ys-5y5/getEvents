@@ -1,0 +1,544 @@
+openapi: 3.0.3
+info:
+  title: getValuation API
+  description: |
+    Returns quantitative and qualitative valuation metrics for specified tickers.
+
+    Supports two modes:
+    1. Manual mode (cache=false): Requires explicit ticker list via tickers parameter
+    2. Cache mode (cache=true): Automatically fetches events and evaluates tickers with upcoming events
+
+    Valuation includes:
+    - Quantitative metrics: PBR, PSR, PER, ROE, EV/EBITDA, RunwayYears, etc.
+    - Qualitative metrics: Consensus target price, analyst rating profiles with D+N gap analysis
+  version: 1.0.0
+  contact:
+    name: Financial Event API Support
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /getValuation:
+    get:
+      summary: Get valuation metrics for tickers
+      description: |
+        Retrieves comprehensive valuation data for specified tickers or for tickers with upcoming events.
+
+        **Manual Mode (cache=false)**:
+        - Requires tickers parameter with comma-separated ticker symbols
+        - Evaluates only the specified tickers
+
+        **Cache Mode (cache=true)**:
+        - Optional tickers parameter
+        - Internally calls getEvent using date range from docs/getEventCache.json meta.request
+        - Evaluates all tickers that have events in the date range
+        - If getEvent call fails, attempts to use existing cache
+
+        Expected response time: 15-20 seconds per ticker (due to sequential API calls for 14 D+N horizons).
+      operationId: getValuation
+      tags:
+        - Valuation
+      parameters:
+        - name: tickers
+          in: query
+          required: false
+          description: |
+            Comma-separated list of ticker symbols (e.g., "AAPL,MSFT,GOOGL").
+
+            **Conditional requirement**:
+            - Required when cache=false
+            - Optional when cache=true (if omitted, uses tickers from event cache)
+          schema:
+            type: string
+          example: "AAPL,MSFT,GOOGL"
+
+        - name: cache
+          in: query
+          required: false
+          description: |
+            Whether to use event cache for ticker selection.
+
+            - true: Trigger getEvent internally and use event tickers
+            - false: Use manually specified tickers parameter
+
+            Default: true
+          schema:
+            type: boolean
+            default: true
+          example: true
+
+      responses:
+        '200':
+          description: |
+            Success. Returns valuation metrics for requested tickers.
+            Structure: { "meta": {...}, "valuations": [...] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValuationResponse'
+              examples:
+                successfulValuation:
+                  summary: Successful valuation for multiple tickers
+                  value:
+                    meta:
+                      type: "meta"
+                      getValuation_generated_at: "2025-11-25T11:00:00Z"
+                      request:
+                        tickers: ["AAPL", "MSFT"]
+                        cache: false
+                      collectionErrorChecklist:
+                        function: "getValuation"
+                        status:
+                          - id: "fmp-income-statement"
+                            success: true
+                            statusCode: 200
+                            errorMessage: null
+                          - id: "fmp-balance-sheet-statement"
+                            success: true
+                            statusCode: 200
+                            errorMessage: null
+                    valuations:
+                      - ticker: "AAPL"
+                        quantitive:
+                          PBR: 32.5
+                          PSR: 7.8
+                          PER: 28.3
+                          ROE: 0.147
+                          EV_EBITDA: 22.1
+                          RunwayYears: 5.2
+                        qualitative:
+                          ConsensusTargetPrice: 195.50
+                          PriceTargetSummary:
+                            symbol: "AAPL"
+                            lastMonthCount: 15
+                            lastMonthAvgPriceTarget: 195.50
+                            lastQuarterCount: 42
+                            lastQuarterAvgPriceTarget: 192.30
+                            lastYearCount: 156
+                            lastYearAvgPriceTarget: 185.75
+                            allTimeCount: 312
+                            allTimeAvgPriceTarget: 178.25
+                            publishers: "[\"TheFly\",\"StreetInsider\"]"
+                          analystRating: {}
+                          EachPriceTargetConsensusWithRating: []
+                      - ticker: "MSFT"
+                        quantitive:
+                          PBR: 11.2
+                          PSR: 12.5
+                          PER: 34.8
+                          ROE: 0.382
+                          EV_EBITDA: 24.7
+                          RunwayYears: 3.8
+                        qualitative:
+                          ConsensusTargetPrice: 425.00
+                          PriceTargetSummary: null
+                          analystRating: {}
+                          EachPriceTargetConsensusWithRating: []
+
+        '400':
+          description: |
+            Bad Request. Invalid parameters.
+
+            Reasons:
+            - cache=false but tickers parameter is missing
+            - cache=true but docs/getEventCache.json does not exist or lacks meta.request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingTickers:
+                  summary: cache=false without tickers parameter
+                  value:
+                    error: "Missing required parameter"
+                    message: "tickers parameter is required when cache=false"
+                    code: "MISSING_TICKERS"
+
+                cacheNotInitialized:
+                  summary: cache=true but event cache not initialized
+                  value:
+                    error: "Cache not initialized"
+                    message: "docs/getEventCache.json does not exist or lacks meta.request. Please call GET /getEvent first."
+                    code: "CACHE_NOT_INITIALIZED"
+
+        '500':
+          description: |
+            Internal Server Error. Unexpected error during valuation calculation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internalError:
+                  summary: Internal server error
+                  value:
+                    error: "Internal server error"
+                    message: "An unexpected error occurred during valuation calculation"
+                    code: "INTERNAL_ERROR"
+
+components:
+  schemas:
+    ValuationResponse:
+      type: object
+      description: Response containing valuation data for requested tickers
+      required:
+        - meta
+        - valuations
+      properties:
+        meta:
+          $ref: '#/components/schemas/ValuationMeta'
+
+        valuations:
+          type: array
+          description: Array of valuation records, one per ticker
+          items:
+            $ref: '#/components/schemas/ValuationRecord'
+
+    ValuationMeta:
+      type: object
+      description: Metadata about the valuation execution
+      required:
+        - type
+        - getValuation_generated_at
+      properties:
+        type:
+          type: string
+          enum: [meta]
+          description: Fixed value "meta"
+          example: "meta"
+
+        getValuation_generated_at:
+          type: string
+          format: date-time
+          description: UTC timestamp when valuation was generated
+          example: "2025-11-25T11:00:00Z"
+
+        request:
+          type: object
+          description: Snapshot of request parameters
+          properties:
+            tickers:
+              type: array
+              items:
+                type: string
+              description: List of evaluated tickers
+              example: ["AAPL", "MSFT"]
+
+            cache:
+              type: boolean
+              description: Whether cache mode was used
+              example: false
+
+        collectionErrorChecklist:
+          type: object
+          description: Service call results for all valuation-related APIs
+          required:
+            - function
+            - status
+          properties:
+            function:
+              type: string
+              enum: [getValuation]
+              description: Function name (fixed as "getValuation")
+              example: "getValuation"
+
+            status:
+              type: array
+              description: Results of service calls to ApiList.json services
+              items:
+                type: object
+                required:
+                  - id
+                  - success
+                properties:
+                  id:
+                    type: string
+                    description: Service ID from ApiList.json
+                    example: "fmp-income-statement"
+
+                  success:
+                    type: boolean
+                    description: Whether the service call succeeded
+                    example: true
+
+                  statusCode:
+                    type: integer
+                    description: HTTP status code
+                    example: 200
+
+                  errorMessage:
+                    type: string
+                    nullable: true
+                    description: Error message if failed, null if successful
+                    example: null
+
+    ValuationRecord:
+      type: object
+      description: Valuation metrics for a single ticker
+      required:
+        - ticker
+      properties:
+        ticker:
+          type: string
+          description: Stock ticker symbol
+          example: "AAPL"
+
+        quantitive:
+          type: object
+          description: |
+            Quantitative valuation metrics calculated from financial statements.
+            Based on docs/evMethod.json metrics.getQuantitiveValuation definitions.
+
+            Common metrics include:
+            - PBR: Price to Book Ratio
+            - PSR: Price to Sales Ratio
+            - PER: Price to Earnings Ratio
+            - ROE: Return on Equity
+            - EV_EBITDA: Enterprise Value to EBITDA
+            - RunwayYears: Cash runway in years
+
+            Values are null if calculation is not possible (missing data).
+          additionalProperties:
+            type: number
+            nullable: true
+          example:
+            PBR: 32.5
+            PSR: 7.8
+            PER: 28.3
+            ROE: 0.147
+            EV_EBITDA: 22.1
+            RunwayYears: 5.2
+
+        qualitative:
+          type: object
+          description: |
+            Qualitative valuation metrics based on analyst consensus and ratings.
+            Based on docs/evMethod.json metrics.getQualativeValuation definitions.
+          properties:
+            ConsensusTargetPrice:
+              type: number
+              nullable: true
+              description: Average adjusted price target from analysts
+              example: 195.50
+
+            PriceTargetSummary:
+              type: object
+              nullable: true
+              description: |
+                Summary statistics from fmp-price-target-summary API.
+                Pass-through of FMP response format.
+              properties:
+                symbol:
+                  type: string
+                  description: Ticker symbol
+                  example: "AAPL"
+
+                lastMonthCount:
+                  type: integer
+                  nullable: true
+                  description: Number of price targets in last month
+                  example: 15
+
+                lastMonthAvgPriceTarget:
+                  type: number
+                  nullable: true
+                  description: Average price target in last month
+                  example: 195.50
+
+                lastQuarterCount:
+                  type: integer
+                  nullable: true
+                  description: Number of price targets in last quarter (3 months)
+                  example: 42
+
+                lastQuarterAvgPriceTarget:
+                  type: number
+                  nullable: true
+                  description: Average price target in last quarter
+                  example: 192.30
+
+                lastYearCount:
+                  type: integer
+                  nullable: true
+                  description: Number of price targets in last year
+                  example: 156
+
+                lastYearAvgPriceTarget:
+                  type: number
+                  nullable: true
+                  description: Average price target in last year
+                  example: 185.75
+
+                allTimeCount:
+                  type: integer
+                  nullable: true
+                  description: Total number of price targets all time
+                  example: 312
+
+                allTimeAvgPriceTarget:
+                  type: number
+                  nullable: true
+                  description: Average price target all time
+                  example: 178.25
+
+                publishers:
+                  type: string
+                  nullable: true
+                  description: JSON string of news publishers array
+                  example: "[\"TheFly\",\"StreetInsider\"]"
+
+            analystRating:
+              type: object
+              description: |
+                Analyst rating profiles with D+N gap analysis.
+                Contains statistics for each analyst's historical accuracy.
+
+                For each analyst, calculates average gap rate and deviation across
+                14 D+N horizons (0,1,2,3,4,5,6,7,14,21,30,60,180,365 days).
+
+                Only includes D+N statistics with sample size >= 3.
+              additionalProperties: true
+              example: {}
+
+            EachPriceTargetConsensusWithRating:
+              type: array
+              description: |
+                Individual analyst price targets with their D+N rating profiles.
+                Merges price target data with analyst-specific D+N gap statistics.
+              items:
+                type: object
+                required:
+                  - symbol
+                  - publishedDate
+                  - analystName
+                  - priceTarget
+                properties:
+                  symbol:
+                    type: string
+                    description: Ticker symbol
+                    example: "RGTI"
+
+                  publishedDate:
+                    type: string
+                    format: date-time
+                    description: When the price target was published
+                    example: "2025-11-20T12:00:00Z"
+
+                  newsURL:
+                    type: string
+                    nullable: true
+                    description: URL of the news article
+                    example: "https://example.com/article"
+
+                  newsTitle:
+                    type: string
+                    nullable: true
+                    description: Title of the news article
+                    example: "Analyst upgrades RGTI to Buy"
+
+                  analystName:
+                    type: string
+                    description: Name of the analyst
+                    example: "David Williams"
+
+                  priceTarget:
+                    type: number
+                    nullable: true
+                    description: Original price target
+                    example: 25.00
+
+                  adjPriceTarget:
+                    type: number
+                    nullable: true
+                    description: Adjusted price target (split-adjusted)
+                    example: 25.00
+
+                  priceWhenPosted:
+                    type: number
+                    nullable: true
+                    description: Stock price when target was posted
+                    example: 18.50
+
+                  newsPublisher:
+                    type: string
+                    nullable: true
+                    description: Publisher of the news
+                    example: "TheFly"
+
+                  newsBaseURL:
+                    type: string
+                    nullable: true
+                    description: Base URL of news publisher
+                    example: "https://thefly.com"
+
+                  analystCompany:
+                    type: string
+                    nullable: true
+                    description: Company/firm the analyst works for
+                    example: "Goldman Sachs"
+
+                  D+0AVGGapRate:
+                    type: number
+                    nullable: true
+                    description: Average gap rate at D+0 for this analyst
+                    example: 0.05
+
+                  D+0deviation:
+                    type: number
+                    nullable: true
+                    description: Standard deviation of gap rate at D+0
+                    example: 0.12
+
+                  D+7AVGGapRate:
+                    type: number
+                    nullable: true
+                    description: Average gap rate at D+7 for this analyst
+                    example: 0.08
+
+                  D+7deviation:
+                    type: number
+                    nullable: true
+                    description: Standard deviation of gap rate at D+7
+                    example: 0.15
+
+                  D+365AVGGapRate:
+                    type: number
+                    nullable: true
+                    description: Average gap rate at D+365 for this analyst
+                    example: 0.22
+
+                  D+365deviation:
+                    type: number
+                    nullable: true
+                    description: Standard deviation of gap rate at D+365
+                    example: 0.30
+
+                additionalProperties:
+                  description: |
+                    Additional D+N statistics for other horizons (1,2,3,4,5,6,14,21,30,60,180).
+                    Format: D+{N}AVGGapRate and D+{N}deviation
+
+    ErrorResponse:
+      type: object
+      description: Standard error response
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          description: Short error title
+          example: "Missing required parameter"
+
+        message:
+          type: string
+          description: Detailed error message
+          example: "tickers parameter is required when cache=false"
+
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "MISSING_TICKERS"

@@ -1,0 +1,97 @@
+Render.com에 배포된 JSON 전용 웹 API로, 
+사용자가 지정한 날짜 범위 안에서 주가에 유의미한 영향을 준 공식 이벤트를 탐지해 
+티커, 이벤트 분류, 영향 분석 요약, 근거 링크 등의 정보 번들을 반환합니다. 
+
+기능:
+A. 이벤트가 있는 기업 ticker값과 이벤트 날짜 수집 (getEvent 엔드포인트)
+    1. 탐색 범위 한정
+        1-1. 탐색 기간 한정
+            - 조건: 사용자가 JSON 전용 웹 API에 시작일(startDate)과 종료일(endDate)을 자연수로 입력하여 호출
+            - startDate, endDate는 오늘을 기준으로 한 "며칠 뒤"를 의미하는 양의 정수 (예: 1, 2, 3, ...)
+            - 날짜 범위는 양 끝을 모두 포함하는 것으로 함
+                - 예시: 오늘이 T일 때, startDate=3, endDate=4이라면, 유효 기간은 [T+3일, T+4일]
+            - 유효성 검사 규칙:
+                - startDate와 endDate는 모두 자연수(1 이상의 정수)여야 한다.
+                - startDate ≤ endDate 여야 한다.
+            - startDate, endDate(정수)를 서버 기준 “오늘” 날짜에 더해서 **ISO 날짜 문자열(YYYY-MM-DD)**로 변환한다.
+            - 이렇게 변환된 값을 {fromDate}, {toDate} 자리의 템플릿에 바인딩한다.
+            - 모든 날짜 계산은 UTC(서버 시스템 타임존) 기준으로 수행한다.
+            - 위 조건을 만족하지 않으면 400 오류와 함께 올바른 입력 예시를 JSON으로 반환한다.
+                - 예시 응답:
+                {
+                    "error": "INVALID_DATE_RANGE",
+                    "example": { "startDate": 3, "endDate": 7 }
+                }
+        1-2. 백엔드에서 탐색 기업 대상 한정
+            - docs/symbolCache.json 파일에 기록된 항목 사용
+            - docs/symbolCache.json 파일의 generated_at 값이 오늘을 기준으로 7일이 지난 경우 캐시 업데이트
+                - 조건: docs/ApiList.json 파일에서 JSONPath $["filter"] 하위의 엔드포인트로 수집할 수 있는 모든 객체 수집
+                    - $["filter"] 하위에는 API가 확장될 수 있어 수집시 각 항목에 정의된 fieldMap을 준수하여야 함
+                - symbolCache 저장 규칙
+                    - 변환된 데이터에서 티커를 의미하는 필드명(ticker, symbol 등)은 fieldMap으로 통일된 이름("ticker")만 사용한다.
+                    - symbolCache를 생성하는 코드는 이 통일된 "ticker" 필드만을 참조하며, fieldMap에 의해 추가로 매핑된 다른 필드는 모두 무시한다. 따라서 fieldMap에 새로운 로컬필드가 추가되더라도 symbolCache 관련 코드는 수정하지 않는다.
+                    - docs/symbolCache.json 파일의 스키마에 맞춰 "ticker" 값을 중복 없이 저장한다.
+                        - (예: 배열 기준 중복 제거, { "ticker": "AAPL", ... } 형태 등)
+    2. 이벤트 정보 수집
+        - 조건: docs/ApiList.json 파일에서 JSONPath $["getEvent"] 하위의 엔드포인트로 수집할 수 있는 모든 객체 수집
+            - $["getEvent"] 하위에는 API가 확장될 수 있어 수집시 각 항목에 정의된 fieldMap을 준수하여야 함
+        - startDate, endDate(정수)를 서버 기준 “오늘” 날짜에 더해서 **ISO 날짜 문자열(YYYY-MM-DD)**로 변환한다.
+        - 이렇게 변환된 값을 {fromDate}, {toDate} 자리의 템플릿에 바인딩한다.
+    3. 1,2 정보 수집 후 기본 응답 형식 (NDJSON 이벤트 스트림)
+        - getEvent 엔드포인트는 기본적으로 docs/getEventOutputSchema.jsonl 출력 형식을 준수하는 이벤트 레코드를 NDJSON으로 반환한다.
+        - check 파라미터가 생략되었거나 false 인 경우, 이벤트 레코드만 출력한다.
+            {"source":"earningCalendar","ticker":"AAPL","date":"2025-01-01"}
+            {"source":"earningCalendar","ticker":"MSFT","date":"2025-01-02"}
+            {"source":"information", ...}
+            ...
+    4. 수집 에러 체크리스트 메타 레코드 (옵션)
+        - 요청에 check=true 가 입력된 경우에만, 모든 이벤트 레코드를 출력한 뒤 마지막 줄에 메타 레코드를 한 줄 추가한다.
+        - 메타 레코드 형식:
+            {"type":"meta","collectionErrorChecklist":{ ... }}
+        - 전체 예시:
+            {"source":"earningCalendar","ticker":"AAPL","date":"2025-01-01"}
+            {"source":"earningCalendar","ticker":"MSFT","date":"2025-01-02"}
+            {"source":"information", ...}
+            ...
+            // (check=true 인 경우 마지막 줄)
+            {"type":"meta","collectionErrorChecklist":{ ... }}
+        - collectionErrorChecklist 내용:
+            - docs/ApiList.json 파일에서 JSONPath $["getEvent"]에 존재하는 모든 항목(각 * 아래의 service 노드)에 대해, 각 service 호출의 성공/실패 여부를 요약한 객체 목록을 넣는다.
+            - 예시 응답:
+                {
+                    "type": "meta",
+                    "collectionErrorChecklist": {
+                        "function": "getEvent",
+                        "status": [
+                            {"id": "fmp-earnings-calendar", "success":  true, "statusCode": 200, "errorMessage": null},
+                            {"id": "some-other-service",    "success": false, "statusCode": 500, "errorMessage": "..." }
+                        ]
+                    }
+                }
+
+요구사항:
+- 정보 수집 대상 엔드포인트 정의
+    - docs/ApiList.json 파일에서 JSONPath $["{functionName}"]["{informationName}"] 가 가리키는 객체를 로드한다.
+        - {functionName}, {informationName} 는 각각 ApiList.json의 키 값 (예: filter, target 혹은 getEvent, earningCalendar)으로 치환하여 사용한다.
+    - 이 객체 아래의 각 service 노드(예: "service-FMP")에 대해 다음을 수행한다:
+        - service.API: 호출할 엔드포인트 URL 문자열
+        - service.fieldMap: { 로컬필드명: 원격응답키 } 구조의 매핑 정보
+            - 구현 시 provider 응답 키 이름(예: "symbol", "date")은 코드에 직접 하드코딩하지 않고, 항상 fieldMap의 value를 통해서만 참조한다.
+            - fieldMap에 새로운 (로컬필드명, 원격응답키) 쌍이 추가되더라도 수집/매핑 코드 변경 없이 자동으로 반영될 수 있도록, fieldMap 항목 전체를 일반화된 루프 등으로 순회하여 매핑한다.
+- 데이터 수집이 필요한 모든 기능은 데이터 수집 규칙 준수
+    - 각 service.API를 호출하여 JSON 응답을 가져온다.
+    - 응답에서 fieldMap의 value에 해당하는 키만 추출하고, fieldMap의 key 이름으로 매핑하여 저장한다.
+        - 이때 특정 응답키 이름(예: "symbol", "date")에 대한 if/switch 분기 로직을 두지 말고, fieldMap의 (로컬필드명, 원격응답키) 쌍을 기준으로만 동작하도록 구현한다.
+        - 예: { "ticker": "symbol", "date": "date" } 라면 응답의 "symbol", "date" 값을 읽어와 내부 데이터 구조의 "ticker", "date" 필드에 매핑한다.
+        - 예: fieldMap에 "eps": "reportedEPS" 와 같은 항목이 추가될 경우, 별도 코드 수정 없이 "eps" 필드가 자동으로 함께 매핑되는 것을 목표로 한다.
+- getEvent 요청 파라미터
+    - startDate: 자연수, 필수
+    - endDate: 자연수, 필수
+    - check: 선택, boolean
+        - 기본값: false
+        - check=true 인 경우에만 마지막 줄에 {"type":"meta","collectionErrorChecklist":{ ... }} 메타 레코드를 추가 출력한다.
+        - collectionErrorChecklist는 { function, status[] } 형태의 객체이다.
+
+제약사항:
+- 이벤트 응답 데이터(getEvent 응답)는 세션에만 저장하며 요청 종료 시 폐기한다.
+- 다만 티커 목록 캐시(docs/symbolCache.json)는 시스템 전역 캐시로서 파일에 영속 저장한다.

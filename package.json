@@ -1,0 +1,43 @@
+{
+  "name": "financial-event-api",
+  "version": "1.0.0",
+  "description": "JSON-based REST API for financial event data and valuation metrics, deployed on Render.com",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:contract": "jest --testPathPattern=contract"
+  },
+  "keywords": [
+    "financial",
+    "api",
+    "events",
+    "valuation",
+    "fmp",
+    "ndjson"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "axios-retry": "^4.5.0",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "nock": "^14.0.10"
+  }
+}

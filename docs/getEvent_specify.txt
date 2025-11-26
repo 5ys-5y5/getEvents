@@ -1,0 +1,681 @@
+Render.com에 배포된 JSON 전용 웹 API로, 
+사용자가 지정한 날짜 범위 안에서 ApiList.json에 기록된 API를 참고하여 
+티커, 이벤트 분류 정보 번들을 반환합니다. 
+
+
+- 기능:
+- 공통 HTTP 규칙
+    - 이 문서에서 정의하는 모든 엔드포인트는 HTTP GET 메서드만 사용한다.
+    - 엔드포인트별 기본 경로와 쿼리 파라미터 형식은 아래와 같다.
+        - getEvent: GET /getEvent?startDate={startDate}&endDate={endDate}
+        - getEventLatest: GET /getEventLatest
+        - getValuation: GET /getValuation?tickers={ticker1,ticker2,...}&cache={true|false}
+    - 요청 바디(JSON body)는 사용하지 않고, 모든 입력은 쿼리 스트링으로 전달한다.
+    - getValuation 전용 파라미터 규칙
+        - tickers: 쉼표(,)로 구분된 티커 문자열. 예) "AAPL,MSFT,GOOGL"
+            - cache=false 이거나 cache 파라미터가 생략된 경우: 최소 1개 이상의 티커가 필수.
+            - cache=true 인 경우: tickers 파라미터는 없어도 되고, 존재하더라도 사용하지 않는다(무시).
+        - cache:
+            - "true" 또는 "false" 문자열만 허용.
+            - 생략 시 기본값은 "true".
+
+
+
+    A. 이벤트가 있는 기업 ticker값과 이벤트 날짜 수집 (getEvent 엔드포인트)
+        1. 탐색 범위 한정
+            1-1. 탐색 기간 한정
+                - 조건: 클라이언트가 GET /getEvent?startDate={startDate}&endDate={endDate} 형식으로 호출한다.
+                    - startDate, endDate는 쿼리 파라미터로 전달되며, 자연수여야 한다.
+                - startDate, endDate는 오늘을 기준으로 한 "며칠 뒤"를 의미하는 양의 정수 (예: 1, 2, 3, ...)
+                - 날짜 범위는 양 끝을 모두 포함하는 것으로 함
+                    - 예시: 오늘이 T일 때, startDate=3, endDate=4이라면, 유효 기간은 [T+3일, T+4일]
+                - 유효성 검사 규칙:
+                    - startDate와 endDate는 모두 자연수(1 이상의 정수)여야 한다.
+                    - startDate ≤ endDate 여야 한다.
+                - startDate, endDate(정수)를 서버 기준 “오늘” 날짜에 더해서 **ISO 날짜 문자열(YYYY-MM-DD)**로 변환한다.
+                - 이렇게 변환된 값을 {fromDate}, {toDate} 자리의 템플릿에 바인딩한다.
+                - 모든 날짜 계산은 UTC(서버 시스템 타임존) 기준으로 수행한다.
+                - 위 조건을 만족하지 않아 유효성 검증에 실패한 경우:
+                    - HTTP status 400을 반환한다.
+                    - Content-Type은 application/json을 사용한다.
+                    - NDJSON 스트림(eventRecord/metaRecord)은 전혀 출력하지 않고, 단일 JSON 에러 객체만 반환한다.
+                    - 에러 응답 JSON의 예시는 다음과 같다.
+                        {
+                            "error": "INVALID_DATE_RANGE",
+                            "message": "startDate와 endDate는 1 이상의 정수이고 startDate ≤ endDate 여야 합니다.",
+                            "details": {
+                                "startDate": 7,
+                                "endDate": 3
+                            }
+                        }
+            1-2. 백엔드에서 탐색 기업 대상 한정
+                - docs/symbolCache.json 파일에 기록된 항목 사용
+                - docs/symbolCache.json 파일의 meta.symbolCache_generated_at 값이 오늘을 기준으로 7일 이상 지난 경우 캐시 업데이트를 시도한다.
+                    - 조건: docs/ApiList.json 파일에서 ApiList["filter"] 하위의 엔드포인트로 수집할 수 있는 모든 객체 수집
+                        - ApiList["filter"] 하위에는 API가 확장될 수 있어 수집시 각 항목에 정의된 fieldMap을 준수하여야 함
+                    - symbolCache 저장 규칙
+                        - 변환된 데이터에서 티커를 의미하는 필드명(ticker, symbol 등)은 fieldMap으로 통일된 이름("ticker")만 사용한다.
+                        - symbolCache를 생성하는 코드는 이 통일된 "ticker" 필드만을 참조하며, fieldMap에 의해 추가로 매핑된 다른 필드는 모두 무시한다. 따라서 fieldMap에 새로운 로컬필드가 추가되더라도 symbolCache 관련 코드는 수정하지 않는다.
+                        - docs/symbolCache.json 파일의 스키마에 맞춰 "ticker" 값을 중복 없이 저장한다.
+                            - 전체 구조 예:
+                                {
+                                  "meta": {
+                                    "symbolCache_generated_at": "2025-11-19T11:54:51Z",
+                                    "sources": [
+                                      {
+                                        "id": "fmp-company-screener",
+                                        "endpoint": "...",
+                                        "params": { ... }
+                                      }
+                                    ]
+                                  },
+                                  "ticker": {
+                                    "AAPL": { "sector": "...", "industry": "..." },
+                                    "MSFT": { "sector": "...", "industry": "..." }
+                                  }
+                                }
+                            - "ticker" 필드는 티커 심볼을 키로 하는 객체이며, 배열 형태는 사용하지 않는다.
+                            - 동일한 티커 키가 중복될 경우 마지막 기록이 우선한다.
+
+                    - 네트워크 오류, HTTP 5xx 응답 등으로 갱신에 실패할 경우 최대 3회까지 재시도한다.
+                    - 3회 모두 실패한 경우:
+                        - 기존 docs/symbolCache.json 내용을 계속 사용한다.
+                        - getEvent 의 metaRecord.collectionErrorChecklist.status 에
+                            - id: symbolCache 메타에 기록된 meta.sources[*].id
+                            - success: false
+                            - statusCode, errorMessage: 오류 상황에 맞는 값을
+                          추가해 둔다.
+                    - 갱신에 성공한 경우:
+                        - 위와 동일한 id 로 success: true 인 status 항목을 남긴다.
+        2. 이벤트 정보 수집
+            - 조건: docs/ApiList.json 파일에서 ApiList["getEvent"] 하위의 엔드포인트로 수집할 수 있는 모든 객체 수집
+                - ApiList["getEvent"] 하위에는 API가 확장될 수 있어 수집시 각 항목에 정의된 fieldMap을 준수하여야 함
+            - startDate, endDate(정수)를 서버 기준 “오늘” 날짜에 더해서 **ISO 날짜 문자열(YYYY-MM-DD)**로 변환한다.
+            - 이렇게 변환된 값을 {fromDate}, {toDate} 자리의 템플릿에 바인딩한다.
+            - 이벤트 수집 결과 중 ticker 값이 docs/symbolCache.json 의 ticker 객체에 존재하지 않는 레코드는 탐색 대상이 아닌 것으로 간주하고 getEvent 응답 및 캐시에서 제외한다.
+        3. 1,2 정보 수집 후 기본 응답 형식 (NDJSON 이벤트 스트림)
+            - getEvent 엔드포인트는 기본적으로 docs/getEventOutputSchema.jsonl 출력 형식을 준수하는 이벤트 레코드를 NDJSON으로 반환한다.
+            - HTTP 200(성공) 응답인 경우에만 NDJSON 스트림을 사용하며, 형식은 다음과 같다.
+                - 0개 이상의 eventRecord 라인
+                - 마지막에 metaRecord 한 줄
+            - HTTP 200(성공) 응답인 경우에는, 일부 외부 API 호출이 실패하더라도 NDJSON 스트림 형식을 유지한다.
+                - 이미 출력된 eventRecord 라인은 그대로 유지하고,
+                - 마지막 metaRecord.collectionErrorChecklist.status 에 각 실패 내역을 기록한다.
+            - HTTP 4xx/5xx 에러 응답은 다음 두 경우에만 사용한다.
+                1) 입력 유효성 검증 실패(예: startDate, endDate 유효성 오류 등)로 getEvent 자체를 실행할 수 없는 경우 → 400
+                2) 시스템에서 “핵심 서비스”로 간주하는 외부 엔드포인트들이 모두 실패하여, 의미 있는 이벤트를 구성할 수 없는 경우 → 5xx
+                    - 이 경우 NDJSON 스트림을 전혀 출력하지 않고, application/json 형식의 단일 에러 객체만 반환한다.
+            - eventRecord 정렬 규칙
+                - eventRecord 의 출력 순서는 입력 API 응답과 필터링 결과의 순서를 그대로 따른다.
+                - 별도의 추가 정렬(날짜, ticker 기준 정렬 등)은 수행하지 않는다.
+            - 중복 제거 규칙
+                - (ticker, date, source) 조합이 완전히 동일한 eventRecord 가 여러 번 수집될 경우, 최초 1개만 남기고 나머지는 NDJSON 스트림 및 캐시에서 제거한다.
+            - 스트림 생성 도중 외부 API 실패
+                - NDJSON 스트림 출력이 이미 시작된 이후(일부 eventRecord 가 전송된 뒤)에 외부 API 실패가 발생해도 HTTP status 는 200 으로 유지한다.
+                - metaRecord.collectionErrorChecklist.status 에 해당 오류를 기록하고,
+                  metaRecord 에 포함된 message 또는 별도 필드에 “어떤 단계에서 수집이 중단되었는지”를 요약하여 적는다.
+        4. 이벤트 결과 캐시 저장 (docs/getEventCache.json)
+            - getEvent 엔드포인트가 HTTP 200(성공)으로 NDJSON 스트림(eventRecord* + 마지막 metaRecord)을 모두 전송한 뒤, 동일한 논리적 내용을 다음 규칙에 따라 JSON 캐시 파일로 저장한다.
+            - 캐시 파일 경로: docs/getEventCache.json (서버 실행 디렉토리를 기준으로 한 상대 경로)
+            - 캐시 파일 저장 형식:
+                - 전체 구조는 하나의 JSON 객체이며, 최상위에는 "meta"와 "events" 두 개의 필드가 존재한다.
+                - "meta" 필드
+                    - docs/getEventOutputSchema.jsonl 의 metaRecord 스키마를 준수하는 객체를 기본으로 사용한다.
+                    - 여기에 요청 당시 파라미터 정보를 담는 "request" 필드를 추가로 포함한다.
+                        - meta.request.startDate, meta.request.endDate: 클라이언트가 전달한 자연수 값
+                        - meta.request.fromDate, meta.request.toDate: startDate, endDate를 변환하여 만든 ISO 날짜 문자열(YYYY-MM-DD)
+                - "events" 필드
+                    - docs/getEventOutputSchema.jsonl 의 eventRecord 스키마를 준수하는 객체들의 배열이다.
+                    - NDJSON 스트림에서 metaRecord 를 제외한 모든 eventRecord 라인을 배열로 모아 저장한다.
+                    - 이벤트가 한 건도 없는 경우, "events": [] (빈 배열)로 저장한다.
+            - 캐시 갱신 규칙:
+                - getEvent가 HTTP 200으로 정상 완료될 때마다, docs/getEventCache.json 파일 전체를 새 결과로 덮어쓴다(마지막 성공 응답 기준으로 항상 최신 상태 유지).
+                - HTTP 4xx/5xx 에러 발생 시에는 docs/getEventCache.json 을 갱신하지 않는다. (마지막으로 성공한 결과가 그대로 유지됨)
+                - docs/getEventCache.json 은 서버 인스턴스 전체에서 하나만 유지되는 전역 캐시 파일이다.
+                - 서로 다른 startDate/endDate 조합으로 getEvent가 동시에 호출될 수 있지만, “마지막으로 성공적으로 완료된 요청”의 결과가 캐시를 최종적으로 덮어쓴다(last write wins).
+
+    B. 캐시된 이벤트 결과 조회 (getEventLatest 엔드포인트)
+        1. 개요
+            - getEventLatest 엔드포인트는 docs/getEventCache.json 에 저장된 가장 최근 getEvent 결과를 그대로 반환하는 읽기 전용 API이다.
+            - 이 엔드포인트는 새로운 데이터 수집을 수행하지 않으며, A.1 ~ A.4에 정의된 탐색 범위 한정, symbolCache 갱신, 외부 서비스 호출, NDJSON 스트림 생성 과정을 모두 생략한다.
+            - 대신 A.5에서 생성된 캐시 파일(docs/getEventCache.json)의 내용을 기반으로 응답한다.
+        2. 요청 파라미터
+            - getEventLatest는 startDate, endDate 등의 쿼리 파라미터를 받지 않는다.
+            - 클라이언트는 단순히 GET /getEventLatest 로 호출한다.
+            - 추가 쿼리 파라미터가 오더라도 getEventLatest 구현은 이를 모두 무시하고 캐시 파일만을 사용해야 한다.
+            - 만약 구현상 쿼리 파라미터를 허용하더라도, getEventLatest 구현은 이 파라미터들을 무시하고 캐시 파일만을 사용해야 한다.
+        3. 내부 처리 로직
+            - docs/getEventCache.json 파일을 읽어들인다.
+            - 파일 내용은 A.5에서 정의한 JSON 구조({ "meta": ..., "events": [...] })를 따른다고 가정한다.
+            - getEventLatest는 새로운 외부 API 호출, symbolCache 갱신, 날짜 변환 등의 작업을 수행하지 않고, 오직 이 캐시 파일만을 데이터 소스로 사용한다.
+        4. 응답 형식
+            - Content-Type: application/json
+            - HTTP 200(성공) 응답인 경우, docs/getEventCache.json 의 JSON 내용을 그대로 응답 본문으로 반환한다.
+            - 응답 JSON의 구조는 다음과 같이 요약된다.
+                {
+                "meta": {
+                    "type": "meta",
+                    "getEvent_generated_at": "...",
+                    "request": {
+                    "startDate": <number>,
+                    "endDate": <number>,
+                    "fromDate": "YYYY-MM-DD",
+                    "toDate": "YYYY-MM-DD"
+                    },
+                    "collectionErrorChecklist": {
+                    "function": "getEvent",
+                    "status": [ ... ]
+                    }
+                },
+                "events": [
+                    { "ticker": "...", "date": "YYYY-MM-DD", "source": "...", ... },
+                    ...
+                ]
+                }
+        5. 에러 처리
+        - docs/getEventCache.json 파일이 존재하지 않거나, 파싱할 수 없는 상태라면:
+            - HTTP 404 또는 503 중 하나를 선택하여 에러를 반환한다. (구현 시 한 가지 규칙으로 고정)
+            - Content-Type: application/json
+            - 예시:
+                {
+                  "error": "GET_EVENT_CACHE_NOT_AVAILABLE",
+                  "message": "아직 성공적으로 생성된 getEvent 캐시가 없거나, 캐시 파일을 읽을 수 없습니다."
+                }
+        - 이 경우에도 getEventLatest는 새로운 데이터 수집(getEvent 호출)을 시도하지 않는다. 캐시 조회 전용 엔드포인트임을 유지한다.
+
+    c. 가치 평가 (getValuation 엔드포인트)
+        1. 개요  
+            - getValuation 엔드포인트는 기본적으로 클라이언트가 쿼리 파라미터 tickers 로 전달한 티커 목록을 사용하여 가치 평가를 수행한다.
+                - cache=false이고, tickers 파라미터가 없다면 요청을 400(Bad Request)로 처리한다.
+            - 선택적으로, 쿼리 파라미터 cache=true 인 경우:
+                - cache=true 인 경우 getValuation 은 쿼리 파라미터 tickers 를 사용하지 않는다(존재하더라도 무시한다).
+                - getValuation 실행 전에 내부적으로 getEvent 를 한 번 호출하여 docs/getEventCache.json 을 최신 상태로 갱신하려 시도한다.
+                - 이후 docs/getEventCache.json.events[*] 에서 각 이벤트의 ticker, date, source 를 모두 읽어들인다.
+                    - ticker 는 가치 평가 대상 종목 목록을 만들 때 사용한다.
+                    - date, source 는 각 ticker 에 연결된 이벤트 컨텍스트 정보로서 후속 계산/로깅/응답 스키마에서 활용할 수 있도록 메모리에 유지한다.
+                - docs/getEventCache.json.meta.request 에 기록된 startDate, endDate, fromDate, toDate 정보는 로깅/메타데이터 용도로만 사용하며, 가치 평가 계산 로직에는 직접 개입하지 않는다.
+            - 이후 docs/ApiList.json 및 docs/evMethod.json 을 참조하여, 각 ticker 에 대해 아래 두 가지 방식의 가치 평가를 순차적으로 수행한다.
+                - 방식1: 기업 공시 지표·매출 기반 정량(Quantitative) 가치 평가
+                - 방식2: 컨센서스·애널리스트 기반 정성(Qualitative) 가치 평가
+            - getValuation 은 각 ticker 에 대해 두 방식의 계산 결과를 하나의 평가 객체로 병합해 반환한다.
+            - HTTP 호출 형식
+                - 클라이언트는 GET /getValuation?tickers={ticker1,ticker2,...}&cache={true|false} 형식으로 호출한다.
+                - tickers: 쉼표(,)로 구분된 티커 문자열. 예) "AAPL,MSFT,GOOGL"
+                    - 최소 1개 이상의 티커가 필수.
+                - cache: 선택적 불리언 쿼리 파라미터
+                    - 생략 또는 "false"인 경우: getValuation 은 getEvent/getEventLatest 를 호출하지 않는다.
+                    - "true"인 경우: getValuation 실행 전에 내부적으로 getEvent 를 한 번 호출하여 docs/getEventCache.json 을 갱신하려 시도한다.
+
+        2. 공통 aggregation 규칙 (docs/evMethod.json / aggregations)  
+            - ttmFromQuarterSumOrScaled  
+                - 입력: number[] (income-statement quarter&limit=4 응답에서 특정 항목 값 배열)  
+                - 규칙:
+                    - 값이 4개면 합계 = TTM(최근 4분기 합산)  
+                    - 값이 1~3개면 (합계 / 개수) × 4 로 1년치(TTM)를 근사  
+                    - 값이 0개면 null  
+                - 사용 예: revenueTTM, netIncomeTTM, ebitdaTTM 등 생성
+            - avgFromQuarter  
+                - 입력: number[] (balance-sheet quarter&limit=4 응답)  
+                - 규칙: 배열의 단순 평균 (값이 없으면 null)  
+                - 사용 예: equityAvg = 최근 4분기 평균 자기자본
+            - lastFromQuarter  
+                - 입력: number[]  
+                - 규칙: 배열이 비어 있으면 null, 아니면 values[0] (가장 최근 분기 값)  
+                - 사용 예: totalStockholdersEquity(최근 분기), totalDebtLatest, cashAndCashEquivalentsLatest 등
+            - avgConsensus  
+                - 입력: number[] (adjPriceTarget 값 배열)  
+                - 규칙: 단순 평균 (값이 없으면 null)  
+                - 사용 예: 컨센서스 목표가 계산
+            - ratingAnalyst  
+                - 입력: PriceTargetRecord[] (애널리스트별 priceTarget 히스토리)  
+                - formula: ratingAnalyst(values, horizons=[0,1,2,3,4,5,6,7,14,21,30,60,180,365])  
+                - 설명(개념):
+                    - 각 레코드 r 에 대해 symbol, publishedDate, priceTarget 를 사용한다.
+                    - 각 N ∈ {0,1,2,3,4,5,6,7,14,21,30,60,180,365} 에 대해:
+                        - dₙ = publishedDate + N일  
+                        - P(r, N) = getLastPrice(symbol, dₙ).close  
+                            - docs/ApiList.json 의 getQuantitiveValuation.getLastPrice (serviceId = "fmp-historical-price-eod") 사용  
+                            - getLastPrice 엔드포인트는 한 번의 호출로 여러 날짜의 히스토리를 반환하지 못한다고 가정한다.
+                                - 따라서 각 (symbol, dₙ) 조합마다 개별 호출을 수행할 수 있다.
+                                - horizons = [0,1,2,3,4,5,6,7,14,21,30,60,180,365] 이므로, 하나의 priceTarget 레코드 r 에 대해 symbol 기준 최대 14회까지 호출이 발생할 수 있다.
+                                - (publishedDate+N) 날짜가 휴장일이거나 가격이 없는 경우에는 아래의 휴장일 처리 규칙을 따른다.
+                        - dₙ 날짜에 EOD 가격 데이터가 없는 경우(휴장일 등)에는:
+                            - dₙ 이전의 가장 가까운 거래일 날짜를 찾아 해당 일자의 EOD 가격을 사용한다.
+                            - 이전 거래일 가격도 찾을 수 없는 경우, 해당 레코드 r 의 해당 N 에 대해서는 gap_N(r) 을 계산하지 않고 건너뛴다.
+                        - D+N 괴리율: gap_N(r) = P(r, N) / priceTarget  
+                    - analystName 별로 리포트를 그룹화한 뒤, 각 N에 대해:
+                        - 평균 괴리율 μ_A(N) = gap_N(r) 의 평균  
+                        - 표준편차 σ_A(N) = gap_N(r) 의 표본 표준편차
+                        - 표본 개수 |{r}| < 3 인 N 에 대해서는 유효한 통계로 보지 않는다.
+                            - 해당 N 의 평균/표준편차는 계산하지 않고,
+                            - 이후 결과 JSON에서도 해당 N 에 대응하는 필드(D+NAVGGapRate, D+Ndeviation)를 생략한다.
+                    - 결과적으로
+                        - analystName: David Williams  
+                            - D+0 AVG Gap rate, D+0 deviation  
+                            - …  
+                            - D+365 AVG Gap rate, D+365 deviation  
+                    과 같은 형태의 “애널리스트별 D+N 괴리율 프로파일”을 계산하는 데 사용된다.
+            - consensusWithAnalystRating  
+                - 입력: PriceTargetRecord[] (getEachPriceTargetConsensus 응답 형태)  
+                - formula: consensusWithAnalystRating(values)  
+                - 설명: getEachPriceTargetConsensus 결과의 각 항목에 대해, 동일한 analystName 의 ratingAnalyst 결과(D+N 평균 괴리율 및 편차)를 병합하기 위한 aggregation 으로 정의되어 있다. (현 시점 evMethod.json 에서는 metric 에서 직접 사용하지 않지만, 향후 확장을 위한 빌딩 블록으로 준비됨)
+        3. 방식1: 기업 공시 지표 기반 정량 가치 평가 (metrics.getQuantitiveValuation)  
+            - input: 5. getValuation 엔드포인트에서의 종합 규칙 1) 단계에서 결정된 ticker 목록
+                - cache=true 인 경우, 각 ticker 에 대해 docs/getEventCache.json.events[*] 중 해당 ticker 의 이벤트들을 함께 읽어 date, source 정보를 보조 컨텍스트로 사용할 수 있다.
+            - 데이터 수집:
+                - docs/ApiList.json 파일에서 ApiList["getQuantitiveValuation"] 하위의 엔드포인트로 수집할 수 있는 모든 객체를 로드한다.
+                    - 각 service 노드(예: "service-FMP")의 service.API, service.fieldMap 정의를 사용하여 데이터를 수집한다.
+                    - fieldMap의 value를 통해 원격 응답 키를 참조하고, key를 통해 내부 로컬필드명(예: "ticker", "revenue")으로 매핑한다.
+            - 계산:
+                - docs/evMethod.json 파일의 getQuantitiveValuation에 정의된 수식 및 metrics.getQuantitiveValuation 하위의 metric 정의를 따른다.
+                    - metrics.getQuantitiveValuation.* 항목의 formula에서 사용되는 변수명은 모두 variables 블록에 정의된 serviceId + field + aggregationId 조합을 통해 계산된 값이어야 한다.
+                - 평가 방식(정량 지표)에는 다음이 포함된다.
+                    - PBR, PSR, PER, ROE, EV/EBITDA, RunwayYears, CurrentRatio, CashToRevenueTTM, RevenueYoY, RevenueQoQ, GrossMarginLastQuarter, GrossMarginTTM, RNDIntensityTTM, OperatingMarginTTM, SharesDilutionYoY, DebtToEquityAvg, OtherNonCurrentLiabilitiesToEquityAvg, NetDebtToEquityAvg, APICYoY를 evMethod.json 파일의 정리된 방식으로 계산한다.
+        4. 방식2: 컨센서스·애널리스트 기반 정성 가치 평가 (metrics.getQualativeValuation)  
+            4-1. 개요
+                - input: 5. getValuation 엔드포인트에서의 종합 규칙 1) 단계에서 결정된 ticker 목록
+                    - cache=true 인 경우, 각 ticker 에 대해 docs/getEventCache.json.events[*] 중 해당 ticker 의 이벤트들을 함께 읽어 date, source 정보를 보조 컨텍스트로 사용할 수 있다.
+                - docs/ApiList.json 의 ApiList["getQualativeValuation"] 하위 엔드포인트와 docs/evMethod.json 의 getQualativeValuation 정의를 사용하여, 컨센서스 가격 및 애널리스트 별 가격 목표의 적중도/괴리율을 기반으로 가치 평가를 수행한다.
+                - 컨센서스 기반 평가에서 특히 다음 세 가지 축을 다룬다.
+                    1) ConsensusTargetPrice: 티커별 조정 목표가(adjPriceTarget) 컨센서스
+                    2) Analyst Rating (D+N Gap): 애널리스트 별 D+N 괴리율 프로파일
+                    3) EachPriceTargetConsensusWithRating: 특정 티커의 개별 priceTarget 라인에 애널리스트 괴리율 통계를 병합한 정보
+
+            4-2. 사용 API 및 데이터 구조
+                - getQualativeValuation.getEachPriceTargetConsensus
+                    - docs/ApiList.json 의 ApiList["getQualativeValuation"]["getEachPriceTargetConsensus"] 하위 service를 사용한다.
+                    - 예: service-FMP 의 id = "fmp-price-target"
+                    - 입력: ticker (예: "RGTI")
+                    - 출력: PriceTargetRecord[] (컨센서스용 레코드 배열)
+                        - 대표 필드(로컬 필드 기준 예시)
+                            - ticker (혹은 symbol)
+                            - publishedDate
+                            - newsURL, newsTitle
+                            - analystName
+                            - priceTarget, adjPriceTarget, priceWhenPosted
+                            - newsPublisher, newsBaseURL
+                            - analystCompany
+                        - 예시 (input = RGTI 일 때):
+                            [
+                            {
+                                "symbol": "RGTI",
+                                "publishedDate": "2025-11-11T21:19:06.000Z",
+                                "newsURL": "...",
+                                "newsTitle": "...",
+                                "analystName": "David Williams",
+                                "priceTarget": 40,
+                                "adjPriceTarget": 40,
+                                "priceWhenPosted": 31.4,
+                                "newsPublisher": "TheFly",
+                                "newsBaseURL": "thefly.com",
+                                "analystCompany": "Williams Trading"
+                            },
+                            {
+                                "symbol": "RGTI",
+                                "publishedDate": "2025-11-03T07:35:00.000Z",
+                                "newsURL": "...",
+                                "newsTitle": "...",
+                                "analystName": "Craig Ellis",
+                                "priceTarget": 42,
+                                "adjPriceTarget": 42,
+                                "priceWhenPosted": 44.27,
+                                "newsPublisher": "StreetInsider",
+                                "newsBaseURL": "streetinsider.com",
+                                "analystCompany": "B.Riley Financial"
+                            },
+                            ...
+                            ]
+                - getQualativeValuation.getEachPriceTargetConsensusSummary  // PriceTargetSummary 용
+                    - docs/ApiList.json 의 ApiList["getQualativeValuation"]["getEachPriceTargetConsensusSummary"] 하위 service를 사용한다.
+                        - 예: service-FMP 의 id = "fmp-price-target-summary" :contentReference[oaicite:2]{index=2}
+                    - 입력: ticker (예: "RGTI")
+                    - 출력: PriceTargetSummaryRecord[] (대부분 길이 0 또는 1인 배열)
+                        - 대표 필드(로컬 필드 기준, ApiList.fieldMap 의 key 기준)
+                            - ticker
+                            - lastMonthCount
+                            - lastMonthAvgPriceTarget
+                            - lastQuarterCount
+                            - lastQuarterAvgPriceTarget
+                            - lastYearCount
+                            - lastYearAvgPriceTarget
+                            - allTimeCount
+                            - allTimeAvgPriceTarget
+                            - publishers
+                    - 구현 규칙:
+                        1) docs/ApiList.json 의 service.fieldMap 정의에 따라 원격 응답 키를 위 로컬 필드로 매핑한다.
+                        2) getValuation 응답의 qualitative.PriceTargetSummary 필드는,
+                            - PriceTargetSummaryRecord 배열이 비어 있지 않은 경우 첫 번째 요소(배열[0])를 그대로 사용한다.
+                            - 배열이 비어 있는 경우 null 로 둔다.
+                        3) 이 값은 별도의 docs/evMethod.json metrics 계산을 거치지 않고,
+                        ApiList 서비스 응답을 그대로 패스-스루(pass-through) 한다.
+                - getQualativeValuation.analystRating
+                    - docs/ApiList.json 의 ApiList["getQualativeValuation"]["analystRating"] 하위 service를 사용한다.
+                    - 예: service-FMP 의 id = "fmp-price-target-analyst-name"
+                    - 입력: analystName (예: "David Williams")
+                    - 출력: 해당 애널리스트가 과거에 제시한 모든 priceTarget 히스토리 PriceTargetRecord[]
+                        - 필수 필드(로컬 필드 기준):
+                            - ticker (symbol)
+                            - publishedDate
+                            - analystName
+                            - priceTarget, adjPriceTarget
+                            - priceWhenPosted
+                            - 기타 news 관련 필드 등
+
+                - getQuantitiveValuation.getLastPrice
+                    - docs/ApiList.json 의 ApiList["getQuantitiveValuation"]["getLastPrice"] 하위 service를 사용한다.
+                    - 예: service-FMP 의 id = "fmp-historical-price-eod"
+                    - 역할: 특정 ticker, 특정 날짜(또는 날짜 구간)에 대한 종가(close)를 가져와 D+N 괴리율 계산에 사용한다.
+
+            4-3. D+N 괴리율 및 ratingAnalyst 계산 규칙 (docs/evMethod.json 기준)
+                - 구체적인 계산 규칙은 2. 공통 aggregation 규칙의 ratingAnalyst 정의를 그대로 따른다.
+
+            4-4. 컨센서스 한 줄 기준으로 애널리스트 평가 값 병합 (EachPriceTargetConsensusWithRating)
+
+                - 개요
+                    - 목표: 특정 ticker에 대해 getEachPriceTargetConsensus 로 얻은 각 레코드(한 줄)마다, 해당 analystName의 D+N 괴리율 평균/편차 정보를 함께 제공한다.
+                    - 예: input = RGTI
+                        - 각 라인:
+                            - symbol = "RGTI"
+                            - publishedDate
+                            - analystName = "David Williams" 또는 "Craig Ellis" 등
+                            - priceTarget, adjPriceTarget, priceWhenPosted, ...
+                        - 각 라인에 대해:
+                            - analystName: David Williams
+                                - D+0 AVG Gap rate: ...
+                                - D+0 deviation: ...
+                                - ...
+                                - D+365 AVG Gap rate: ...
+                                - D+365 deviation: ...
+                            - 와 같은 프로파일을 병합
+
+                - docs/evMethod.json 의 aggregations.consensusWithAnalystRating
+                    - id: "consensusWithAnalystRating"
+                    - description: "getEachPriceTargetConsensus 결과의 각 항목에 analystName 기준 ratingAnalyst(D+N 평균 괴리율 및 편차)를 병합"
+                    - input: "PriceTargetRecord[]"
+                    - formula: "consensusWithAnalystRating(values)"
+                    - 구현 규칙(개념):
+                        1) values 배열에서 analystName 을 추출하고, unique analystName 집합을 만든다.
+                        2) 각 analystName 에 대해:
+                            - ApiList.getQualativeValuation.analystRating (fmp-price-target-analyst-name) 호출
+                            - docs/evMethod.json.metrics.getQualativeValuation.analystRating (ratingAnalyst aggregation) 적용
+                            - 애널리스트별 D+N 괴리율 평균/편차 통계 객체를 얻는다.
+                        3) values 의 각 레코드에 대해:
+                            - record.analystName 을 키로 위에서 계산한 통계를 찾고,
+                            - 최종 출력 레코드에 다음 필드를 포함하는 객체를 생성한다.
+                                - symbol, publishedDate, newsURL, newsTitle,
+                                  analystName, priceTarget, adjPriceTarget, priceWhenPosted,
+                                  newsPublisher, newsBaseURL, analystCompany
+                                - 각 N ∈ {0,1,2,3,4,5,6,7,14,21,30,60,180,365} 에 대해:
+                                    - "D+{N}AVGGapRate": 해당 애널리스트의 μ_A(N)
+                                    - "D+{N}deviation": 해당 애널리스트의 σ_A(N)
+                            - 표본 수가 3개 미만인 N 에 대해서는 해당 D+N* 필드를 생성하지 않는다.
+                        4) 최종적으로 이러한 레코드 객체 배열을 반환한다.
+                            - 결과 예시:
+                                {
+                                    "symbol": "RGTI",
+                                    "publishedDate": "2025-11-11T21:19:06.000Z",
+                                    "newsURL": "https://thefly.com/permalinks/entry.php/id4237437/8212286394/RGTI-Rigetti-Computing-price-target-lowered-by--at-Benchmark-heres-why",
+                                    "newsTitle": "Rigetti Computing price target lowered to $40 from $50 at Benchmark",
+                                    "analystName": "David Williams",
+                                    "priceTarget": 40,
+                                    "adjPriceTarget": 40,
+                                    "priceWhenPosted": 31.4,
+                                    "newsPublisher": "TheFly",
+                                    "newsBaseURL": "thefly.com",
+                                    "analystCompany": "Williams Trading",
+                                    "D+0AVGGapRate": ...,
+                                    "D+0deviation": ...,
+                                    ...
+                                    "D+365AVGGapRate": ...,
+                                    "D+365deviation": ...
+                                }
+
+                - docs/evMethod.json 의 metrics.getQualativeValuation.EachPriceTargetConsensusWithRating (신규)
+                    - id: "each-price-target-consensus-with-rating"
+                    - displayName: "Each Price Target Consensus With Analyst Rating"
+                    - formula: "consensusWithAnalystRating(consensusRecords)"
+                    - variables:
+                        - consensusRecords:
+                            - serviceId: "fmp-price-target"  // getEachPriceTargetConsensus
+                            - aggregationId: "consensusWithAnalystRating"
+                    - getValuation 엔드포인트는 티커별 컨센서스 라인에 애널리스트 D+N 괴리율 통계를 결합하고자 할 때, 이 metric을 사용한다.
+
+            4-5. 방식2에서 사용하는 주요 지표 요약
+                - ConsensusTargetPrice (docs/evMethod.json.metrics.getQualativeValuation.ConsensusTargetPrice)
+                    - 각 ticker의 adjPriceTarget 기반 컨센서스 목표가 산출
+                - Analyst Rating (D+N Gap) (docs/evMethod.json.metrics.getQualativeValuation.analystRating)
+                    - 애널리스트별 과거 priceTarget 히스토리에서 D+N 괴리율 평균 및 편차를 계산
+                    - “이 애널리스트의 목표가는 특정 기간(D+N)에서 얼마나 일관되게/보수적으로/공격적으로 맞춰졌는가?”를 정량화
+                - EachPriceTargetConsensusWithRating (docs/evMethod.json.metrics.getQualativeValuation.EachPriceTargetConsensusWithRating)
+                    - 특정 ticker 의 개별 컨센서스 라인에 대해, 해당 애널리스트의 D+N 괴리율 프로파일을 함께 제공
+                    - 예시 출력 포맷:
+                        - analystName: David Williams
+                            - D+0 AVG Gap rate: ...
+                            - D+0 deviation: ...
+                            - ...
+                            - D+365 AVG Gap rate: ...
+                            - D+365 deviation: ...
+                - PriceTargetSummary
+                    - ApiList["getQualativeValuation"]["getEachPriceTargetConsensusSummary"] (fmp-price-target-summary) 응답을 각 ticker 당 하나의 객체로 요약한 값
+                    - ticker, lastMonthCount, lastMonthAvgPriceTarget, lastQuarterCount, lastQuarterAvgPriceTarget, lastYearCount, lastYearAvgPriceTarget, allTimeCount, allTimeAvgPriceTarget, publishers 을 그대로 노출한다.
+
+        5. getValuation 엔드포인트에서의 종합 규칙  
+            - getValuation 은 다음 순서를 따른다.
+                1) 사용할 ticker 및 이벤트 컨텍스트(date, source)를 결정한다.
+                    - 쿼리 파라미터 cache=false 이거나 cache 파라미터가 생략된 경우:
+                        - 쿼리 파라미터 tickers 를 파싱하여 ticker 문자열 배열을 얻는다.
+                        - docs/getEventCache.json 은 ticker/date/source 를 결정하는 데 사용하지 않는다.
+                    - 쿼리 파라미터 cache=true 인 경우:
+                        - getValuation 실행 전에 내부적으로 getEvent 를 한 번 호출하여 docs/getEventCache.json 을 갱신하려 시도한다.
+                            - 이 호출의 성공/실패 정보는 getValuation 의 meta.collectionErrorChecklist 에 기록한다.
+                        - 갱신된 docs/getEventCache.json.events[*] 에 대해:
+                            - 각 이벤트의 ticker, date, source 를 모두 읽어들인다.
+                            - ticker 별로 [{ date, source }, ... ] 형태의 맵 구조를 만들어
+                              이후 단계에서 사용할 수 있도록 메모리에 보관한다.
+                        - ticker 목록은 docs/getEventCache.json.events[*].ticker 의 고유 값 집합으로 만든다.
+                    - 최종 ticker 목록이 비어 있으면 400 에러를 반환한다.
+                2) 각 ticker 에 대해:
+                    - docs/ApiList.json 의 getQuantitiveValuation 경로에 정의된 엔드포인트를 사용해 재무 데이터를 수집하고, docs/evMethod.json 의 aggregations 및 metrics.getQuantitiveValuation 정의에 따라 PBR, PSR, PER, ROE, EV/EBITDA 등 정량 지표를 계산한다.
+                    - docs/ApiList.json 의 getQualativeValuation 경로에 정의된 엔드포인트를 사용해 컨센서스/애널리스트 데이터를 수집하고, docs/evMethod.json 의 aggregations 및 metrics.getQualativeValuation 정의에 따라 ConsensusTargetPrice 와 Analyst Rating (D+N Gap)을 계산한다.
+                3) 각 ticker 별로 정량 지표 + 정성 지표를 하나의 평가 객체로 병합하여 응답 본문에 포함한다.
+            - docs/ApiList.json 의 getQuantitiveValuation, getQualativeValuation 경로에는 향후 엔드포인트가 추가될 수 있으며,
+                - getQuantitiveValuation 에는 docs/evMethod.json 의 metrics.getQuantitiveValuation 에서 필요로 하는 공식에 필요한 요소만 추가한다.
+                - getQualativeValuation 에는 docs/evMethod.json 의 metrics.getQualativeValuation 및 aggregations.ratingAnalyst / consensusWithAnalystRating 이 필요로 하는 필드만 추가한다.
+                    - 단, PriceTargetSummary 와 같이 외부 API 응답을 그대로 패스-스루하는 정성 지표의 경우, 별도의 metrics/aggregations 정의 없이 ApiList.service.fieldMap → getValuationOutputSchema 로 직접 매핑할 수 있다.
+                - 서버 실행 디렉토리를 기준으로 한 상대 경로
+            - 새로운 엔드포인트나 필드를 추가할 때는 항상
+                - 계산이 필요한 새로운 지표(여러 서비스/필드를 조합하는 경우):
+                    - docs/ApiList.json 의 service.fieldMap 정의를 먼저 수정한 뒤,
+                    - docs/evMethod.json 의 metrics / aggregations 정의를 갱신하고,
+                    - 필요한 경우 getEvent_specify_v2.txt 의 c. 가치 평가 절을 업데이트한다.
+                - 외부 API 응답을 그대로 노출하는 패스-스루 필드(예: PriceTargetSummary):
+                    - docs/ApiList.json 의 service.fieldMap 정의만 추가/수정하고,
+                    - getEvent_specify_v2.txt 에 어떤 service 를 어떤 스키마 필드(예: qualitative.PriceTargetSummary)에 매핑하는지 명시한다.
+                    - docs/evMethod.json 에 별도 항목을 추가할 필요는 없다.
+
+        6. 응답 형식 (docs/getValuationOutputSchema.json)
+            - getValuation 엔드포인트는 HTTP 200(성공) 시 Content-Type: application/json 으로 단일 JSON 객체를 반환한다.
+            - 응답 JSON 의 최상위 구조는 다음과 같다.
+                {
+                  "meta": { ... },
+                  "valuations": [ ... ]
+                }
+            - 상세 스키마는 docs/getValuationOutputSchema.json 에 JSON Schema(draft-07) 형식으로 정의한다.
+                - meta: 가치 평가 실행 시각, 요청 파라미터(tickers, cache), collectionErrorChecklist 등 메타데이터
+                - valuations[*]: 티커별 정량/정성 평가 결과(정량 지표, 컨센서스 목표가, PriceTargetSummary, analystRating, EachPriceTargetConsensusWithRating 등)
+
+
+
+- 요구사항:
+    - 정보 수집 대상 엔드포인트 정의
+        - docs/ApiList.json 파일에서 단순 JSON 키 경로 ApiList[{functionName}][{informationName}] 가 가리키는 객체를 로드한다.
+            - {functionName}, {informationName} 는 각각 ApiList.json 의 최상위 키 및 그 하위 키 값 (예: "filter", "target" 혹은 "getEvent", "earningCalendar")으로 치환하여 사용한다.
+            - 별도의 JSONPath 라이브러리는 사용하지 않고, 일반적인 객체 키 접근만으로 구현한다.
+        - 이 객체 아래의 각 service 노드(예: "service-FMP")에 대해 다음을 수행한다:
+            - service.API: 호출할 엔드포인트 URL 문자열
+                - ApiList.json 내 URL 에 포함된 "{fmpApiKey}" 플레이스홀더는 런타임 시 환경 변수 FMP_API_KEY 값으로 치환한다.
+                - FMP_API_KEY 환경 변수가 설정되어 있지 않은 경우, 해당 service 호출은 실패로 간주하고 collectionErrorChecklist.status 에 기록한다.
+            - service.fieldMap: { 로컬필드명: 원격응답키 } 구조의 매핑 정보
+                - 구현 시 provider 응답 키 이름(예: "symbol", "date")은 코드에 직접 하드코딩하지 않고, 항상 fieldMap의 value를 통해서만 참조한다.
+                - 수집/매핑 로직은 fieldMap 항목 전체를 일반화된 루프로 순회하여 동작하며, 개별 응답 키 이름에 대한 if/switch 분기 로직을 두지 않는다.
+                - getEvent 엔드포인트의 응답으로 실제 노출되는 필드 집합은 docs/getEventOutputSchema.jsonl 파일의 eventRecord.properties 에 정의된 로컬필드명 집합과 정확히 일치해야 한다.
+                - docs/getEventOutputSchema.jsonl 파일은 docs/ApiList.json 의 getEvent 하위 service.fieldMap 내용을 기준으로 자동 생성/갱신되는 스키마 파일로 관리한다.
+                    - 스키마 생성 스크립트(또는 빌드 스텝)는 docs/ApiList.json 의 getEvent.*.service.fieldMap 에 정의된 로컬필드명만을 eventRecord.properties 에 추가하며, ApiList.json 에 존재하지 않는 임의의 필드는 추가하지 않는다.
+                    - 스키마는 "additionalProperties": false 를 유지하여, eventRecord 에 스키마에 정의되지 않은 필드가 포함될 경우 검증 오류가 발생하도록 한다.
+                    - 새로운 (로컬필드명, 원격응답키) 쌍을 fieldMap 에 추가하거나 기존 필드를 제거하는 경우, 반드시 이 스크립트를 실행해 docs/getEventOutputSchema.jsonl 의 eventRecord.properties 를 갱신한 뒤 배포한다. 이를 통해 ApiList.json 에 기록된 fieldMap 값만이 getEvent 응답 jsonl 에 출력되도록 보장한다.
+    - 데이터 수집이 필요한 모든 기능은 데이터 수집 규칙 준수
+        - 각 service.API를 호출하여 JSON 응답을 가져온다.
+        - 응답에서 fieldMap의 value에 해당하는 키만 추출하고, fieldMap의 key 이름으로 매핑하여 저장한다.
+            - 이때 특정 응답키 이름(예: "symbol", "date")에 대한 if/switch 분기 로직을 두지 말고, fieldMap의 (로컬필드명, 원격응답키) 쌍을 기준으로만 동작하도록 구현한다.
+            - 예: { "ticker": "symbol", "date": "date" } 라면 응답의 "symbol", "date" 값을 읽어와 내부 데이터 구조의 "ticker", "date" 필드에 매핑한다.
+            - 예: fieldMap에 "eps": "reportedEPS" 와 같은 항목이 추가될 경우,
+            1) 먼저 docs/ApiList.json 의 getEvent.*.service.fieldMap 에 "eps": "reportedEPS" 를 추가하고,
+            2) 스키마 생성 스크립트를 실행해 docs/getEventOutputSchema.jsonl 의 eventRecord.properties 에 "eps" 필드를 추가한 뒤,
+            3) 런타임 수집/매핑 코드는 별도 수정 없이 "eps" 값을 함께 매핑/출력할 수 있어야 한다.
+    - getEvent 요청 파라미터
+        - startDate: 자연수, 필수
+        - endDate: 자연수, 필수
+    - ApiList.json을 로드할 때 service.id 값을 함께 들고 다닌다.
+        - 각 수집 단계(예: symbolCache 갱신, earnings-calendar 호출 등)의 성공/실패를 collectionErrorChecklist.status에 쌓을 때:
+            - statusItem.id = 해당 service.id (또는 symbolCache의 경우 meta.sources[*].id)로 설정.
+            - 문자열 "fmp-company-screener", "fmp-earnings-calendar" 등을 코드에 직접 하드코딩하지 말고, 항상 ApiList에서 읽어온 id를 그대로 사용.
+        - 일부 엔드포인트는 시스템에서 “핵심 서비스”로 간주할 수 있으며(예: earnings-calendar 등), 이들 service.id 집합은 코드 또는 설정으로 관리한다.
+            - 핵심 서비스가 전부 실패하면 getEvent 전체를 5xx 에러로 처리하고 NDJSON 스트림은 출력하지 않는다.
+
+- 제약사항:
+    - getEvent 응답으로 전송되는 NDJSON 스트림은 세션 단위로만 유지하며, HTTP 응답이 완료되면 메모리 상의 버퍼는 폐기한다.
+    - 다만 동일한 내용은 시스템 전역 캐시 파일 docs/getEventCache.json 에 JSON 형태로 영속 저장되며, 이후 getEventLatest 엔드포인트에서 재사용된다.
+    - 티커 목록 캐시(docs/symbolCache.json)는 기존과 동일하게 시스템 전역 캐시로서 파일에 영속 저장한다.
+    - docs 디렉토리 하위 파일(docs/ApiList.json, docs/evMethod.json, docs/symbolCache.json, docs/getEventCache.json 등)에 접근할 때
+        - 절대 경로를 하드코딩하지 않고, 서버 프로세스의 현재 작업 디렉토리를 기준으로 한 상대 경로("docs/…")를 사용한다.
+        - 다양한 배포 환경(Render.com 등)에서도 동일한 상대 경로 로직이 동작하도록 구현한다.
+
+
+
+- 변경사항
+    - EachPriceTargetConsensusWithRating 제거
+    - analystLog.json 생성으로 이후 관련 정보 활용시 모든 애널리스트의 정보 API 호출 없이 관리
+        - analystLog.json을 활용하여 analystRating.json 생성(analyst이름을 unique하게 정리하고 evMethod의 analystRating를 실행)
+    - peer 티커는 ApiList.json의 peer.getPeerTicker를 통해 획득한 ticker들을 /getValuation?tickers={ticker}&cache=false 엔드포인트로 평가 후 평균값 출력
+        - 출력한 값은 /getValuation 엔드포인트의 valuations.quantitative 하단에 valuations.peerQuantitative로 출력
+    - refreshAnalystLog 엔드포인트 업데이트
+        1. analystLog.json 파일에 기록시 ticker의 publishedDate 날짜를 기준으로 D+1, D+2, D+3, D+4, D+5, D+6, D+7, D+14, D+30, D+60, D+180, D+365 일째 날의 가격 정보를 ApiList.json의 getQuantitiveValuation.getLastPrice API를 통해 가격을 확보
+            - ApiList.json의 getQuantitiveValuation.getLastPrice API를 통해 가격을 확보할 수 없는 경우는 null로 출력
+            - analystLog.json 파일에 priceTrend가 없다면 틀을 생성하고, 틀 안에 null인 경우만 찾아서 업데이트하는 방식
+            - 예시
+                {
+                "meta": {
+                    "lastUpdated": "2025-11-26T07:12:15.554Z",
+                    "tickerCount": 3009,
+                    "totalAnalysts": 51610,
+                    "errors": 1,
+                    "duration": "2654509ms"
+                },
+                "analysts": {
+                    "AAPL": [
+                    {
+                        "symbol": "AAPL",
+                        "publishedDate": "2025-11-03T11:39:17.000Z",
+                        "newsURL": "https://thefly.com/permalinks/entry.php/id4227716/2624286394/AAPL-Apple-price-target-raised-by--at-Bernstein-heres-why",
+                        "newsTitle": "Apple price target raised to $325 from $290 at Bernstein",
+                        "analystName": "",
+                        "priceTarget": 325,
+                        "adjPriceTarget": 325,
+                        "priceWhenPosted": 270.37,
+                        "newsPublisher": "TheFly",
+                        "newsBaseURL": "thefly.com",
+                        "analystCompany": "Bernstein",
+                        "priceTrend": [
+                            "D1": 270.77, // 다음 실행시 업데이트 무시
+                            "D2": 271.21, // 다음 실행시 업데이트 무시
+                            ...
+                            "D365": null // 다음 실행시 업데이트 대상
+                        ]
+                    },
+                    {
+                        "symbol": "AAPL",
+                        "publishedDate": "2025-10-31T13:28:11.000Z",
+                        "newsURL": "https://thefly.com/permalinks/entry.php/id4227067/7681286394/AAPL-Apple-price-target-raised-by--at-Argus-heres-why",
+                        "newsTitle": "Apple price target raised to $325 from $280 at Argus",
+                        "analystName": "",
+                        "priceTarget": 325,
+                        "adjPriceTarget": 325,
+                        "priceWhenPosted": 270.64,
+                        "newsPublisher": "TheFly",
+                        "newsBaseURL": "thefly.com",
+                        "analystCompany": "Argus Research"
+                        "priceTrend": [
+                            "D1": 269.81, // 다음 실행시 업데이트 무시
+                            "D2": 266.27, // 다음 실행시 업데이트 무시
+                            ...
+                            "D365": null // 다음 실행시 업데이트 대상
+                        ]
+                    },
+                    ...
+                    ],
+                    ...
+                }
+                }
+        2. 1번을 최소한의 api호출로 실행하기 위해 기존의 값들은 getQualativeValuation.getEachPriceTargetConsensus를 호출하여 값을 불러올 때, 중복되는 값은 변경하지 않고 유지, 추가되는 값에 대해서만 analysts.{ticker} 안에 값 추가 후 priceTrend가 없다면 틀을 생성
+        3. test에 용이하도록 test=true 파라미터가 있다면 symbolCache.json의 상위 10개 ticker에 대해서만 실행
+        - 검증 쿼리
+            - refreshAnalystLog 엔드포인트는 analystLog.json 파일에 기록된 ticker의 publishedDate 날짜를 기준으로 D+1, D+2, D+3, D+4, D+5, D+6, D+7, D+14, D+30, D+60, D+180, D+365 일째 날짜 틀을 생성하고 각 날짜에 맞는 가격 정보를 ApiList.json의 getQuantitiveValuation.getLastPrice API를 통해 가격을 확보하나요?
+            - refreshAnalystLog 엔드포인트는 analystLog.json 파일의 정보를 매번 새로 쓰는 것이 아닌, 기존에 있는 정보를 유지하고, 새로 추가된 정보만 업데이트하며 날짜를 기준 틀을 생성하나요?
+
+
+    - generateRating 엔드포인트 업데이트
+        - 목적: 애널리스트의 발표 내용을 발표 시기를 기준으로 언제 실현된다고 할 수 있을지 추정
+            1. generateRating 엔드포인트는 analystName, analystCompany으로 unique하게 나열
+                - "jhon doe", "Barclays" != "jhon doe", "abc"
+                - 예시
+                {
+                    "meta": {
+                        "lastUpdated": "2025-11-26T07:43:33.988Z",
+                        "analystCount": 3330,
+                        "sourceLogDate": "2025-11-26T07:12:15.554Z",
+                        "duration": "309ms"
+                    },
+                    "analysts": {
+                        "jhon doe": {
+                            "analystName": "jhon doe",
+                            "analystCompany": "Barclays",
+                            "priceTargetCount": 123
+                        },
+                        "jhon doe": {
+                            "analystName": "jhon doe",
+                            "analystCompany": "abc",
+                            "priceTargetCount": 12
+                        },
+                        ...
+                    }
+                }
+            2. 
+                - 예시
+                {
+                    "meta": {
+                        "lastUpdated": "2025-11-26T07:43:33.988Z",
+                        "analystCount": 3330,
+                        "sourceLogDate": "2025-11-26T07:12:15.554Z",
+                        "duration": "309ms"
+                    },
+                    "analysts": {
+                        "jhon doe": {
+                            "analystName": "jhon doe",
+                            "analystCompany": "Barclays",
+                            "priceTargetCount": 123
+                        },
+                        "jhon doe": {
+                            "analystName": "jhon doe",
+                            "analystCompany": "abc",
+                            "priceTargetCount": 12
+                        },
+                        ...
+                    }
+                }
+            2. 
+                        - analystName: David Williams
+                            - D+0 AVG Gap rate: ...
+                            - D+0 deviation: ...
+                            - ...
+                            - D+365 AVG Gap rate: ...
+                            - D+365 deviation: ...

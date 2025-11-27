@@ -152,7 +152,7 @@
 - **FR-014**: 시스템은 각 티커에 대해 docs/evMethod.json의 metrics.getQuantitiveValuation 정의에 따라 PBR, PSR, PER, ROE, EV/EBITDA 등을 계산해야 한다
 - **FR-015**: 시스템은 ttmFromQuarterSumOrScaled aggregation에서 값이 4개면 합계, 4개 미만이면 (평균 * 4)를 적용해야 한다
 - **FR-016**: 시스템은 각 티커에 대해 docs/evMethod.json의 metrics.getQualativeValuation 정의에 따라 ConsensusTargetPrice, analystRating을 계산해야 한다
-- **FR-017**: 시스템은 analystRating 계산 시 각 애널리스트의 과거 priceTarget 히스토리에서 D+N 괴리율 평균과 표준편차를 산출해야 한다
+- **FR-017**: 시스템은 analystRating 계산 시 각 애널리스트의 과거 priceTarget 히스토리에서 D+N 괴리율의 평균(meanGapRate), 표준편차(stdGapRate), 표본 수(count), 표준오차(standardError = stdGapRate / √count), 95% 신뢰구간(ci95Lower, ci95Upper, ci95Width = 2 × 1.96 × standardError)을 산출해야 한다
 - **FR-018**: 시스템은 D+N 괴리율 계산 시 (publishedDate+N) 날짜의 EOD 가격을 fmp-historical-price-eod API에서 조회해야 한다. 14개의 D+N horizon 지점(0,1,2,3,4,5,6,7,14,21,30,60,180,365)마다 개별 API 호출을 수행한다
 - **FR-019**: 시스템은 D+N 날짜가 휴장일일 경우 이전의 가장 가까운 거래일 가격을 사용해야 한다
 - **FR-020**: 시스템은 D+N 괴리율 표본 수가 3개 미만인 경우 해당 N의 통계 필드를 응답에서 생략해야 한다

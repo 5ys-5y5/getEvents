@@ -443,7 +443,7 @@ Inherits all fields from PriceTargetRecord, plus:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `analystRating` | AnalystRatingProfile | D+N gap statistics for this analyst |
+| `analystRating` | AnalystRatingProfile | D+N gap statistics for this analyst with statistical confidence metrics |
 
 **Example**:
 ```json
@@ -454,19 +454,36 @@ Inherits all fields from PriceTargetRecord, plus:
   "priceTarget": 15.00,
   "adjPriceTarget": 15.00,
   "analystRating": {
-    "D+7": {
-      "avgGapRate": 0.98,
-      "deviation": 0.12,
-      "sampleCount": 8
+    "D7": {
+      "meanGapRate": 0.0042,
+      "stdGapRate": 0.067,
+      "count": 8,
+      "standardError": 0.0237,
+      "ci95Lower": -0.0422,
+      "ci95Upper": 0.0506,
+      "ci95Width": 0.0928
     },
-    "D+30": {
-      "avgGapRate": 1.05,
-      "deviation": 0.18,
-      "sampleCount": 7
+    "D30": {
+      "meanGapRate": 0.3939,
+      "stdGapRate": 0.7991,
+      "count": 17,
+      "standardError": 0.1938,
+      "ci95Lower": 0.0140,
+      "ci95Upper": 0.7738,
+      "ci95Width": 0.7597
     }
   }
 }
 ```
+
+**Gap Rate Statistics Fields**:
+- `meanGapRate`: Average gap rate = mean((D+N price / priceWhenPosted) - 1)
+- `stdGapRate`: Standard deviation of gap rates (measures prediction volatility)
+- `count`: Number of valid samples used for calculation
+- `standardError`: Standard error of the mean = stdGapRate / √count
+- `ci95Lower`: Lower bound of 95% confidence interval = mean - 1.96×SE
+- `ci95Upper`: Upper bound of 95% confidence interval = mean + 1.96×SE
+- `ci95Width`: Width of 95% confidence interval = 2 × 1.96 × SE
 
 ### Validation Rules
 

@@ -19,7 +19,8 @@
       "Bash(node test-simple.js:*)",
       "Bash(python -m json.tool:*)",
       "Bash(node test-market-status.js:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

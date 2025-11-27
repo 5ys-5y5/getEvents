@@ -10,6 +10,9 @@ export default function apiGuide(req, res) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Financial Event API - 사용 가이드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -22,15 +25,233 @@ export default function apiGuide(req, res) {
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Malgun Gothic', sans-serif;
+      font-family: 'Noto Sans KR', 'Noto Sans', sans-serif;
       line-height: 1.7;
       color: #111111;
+      background: #999999;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Layout: Sidebar + Main Content */
+    .page-wrapper {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Table of Contents Sidebar */
+    .toc-sidebar {
+      width: 280px;
+      background: #2b2b2b;
+      color: #e0e0e0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 16px;
+      border-right: 1px solid #1a1a1a;
+      z-index: 1000;
+      /* 스크롤바 숨기기 */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE and Edge */
+    }
+
+    .toc-sidebar::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Opera */
+    }
+
+    .toc-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #999999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #3a3a3a;
+    }
+
+    /* Search box styling */
+    .toc-search-box {
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .toc-search-input {
+      width: 100%;
+      padding: 15px 32px 15px 12px;
+      background: #1a1a1a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .toc-search-input:focus {
+      border-color: #0066cc;
+      background: #222222;
+    }
+
+    .toc-search-input::placeholder {
+      color: #666666;
+    }
+
+    .toc-search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #666666;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 1rem;
+      line-height: 1;
+      display: none;
+    }
+
+    .toc-search-clear:hover {
+      color: #999999;
+    }
+
+    .toc-search-clear.show {
+      display: block;
+    }
+
+    .toc-search-result-count {
+      font-size: 0.75rem;
+      color: #999999;
+      margin-top: 6px;
+      padding-left: 4px;
+    }
+
+    .toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .toc-group-box {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      margin-top: 4px;
+      margin-left: 0;
+      border: none;
+      border-left: 0.5px solid #555555;
+      padding-left: 0;
+      background: none;
+      border-radius: 0;
+    }
+
+    /* 위계별 박스 들여쓰기 - 상위 항목의 위계에 따라 좌측 테두리가 보이도록 */
+    .toc-group-box.toc-group-h2 {
+      margin-left: 1.3rem;
+    }
+
+    .toc-group-box.toc-group-h3 {
+      margin-left: 1.3rem;
+    }
+
+    .toc-group-box.toc-group-h4 {
+      margin-left: 1.3rem;
+    }
+
+    .toc-item {
+      margin-bottom: 4px;
+      list-style: none;
+    }
+
+    .toc-group-box .toc-item:last-child {
+      margin-bottom: 0;
+    }
+
+    /* 하위 항목들은 간격을 줄여 세로줄이 연결되어 보이도록 */
+    .toc-item.level-h3,
+    .toc-item.level-h4 {
+      margin-bottom: 0;
+    }
+
+    /* 외부 박스 (호버/선택 상태 표시용) */
+    .toc-link {
+      display: block;
+      text-decoration: none;
+      color: #e0e0e0;
+      padding: 6px 12px 6px 8px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background-color 0.2s, color 0.2s;
+      position: relative;
+    }
+
+    .toc-link:hover {
+      background: #3a3a3a;
+      color: #ffffff;
+    }
+
+    .toc-link.active {
+      background: #0066cc;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    /* 항목별 호버/선택 박스 - 위계에 관계없이 모든 항목이 1위계 박스의 너비와 같은 너비 */
+    .toc-item.level-h2 .toc-link,
+    .toc-item.level-h3 .toc-link,
+    .toc-item.level-h4 .toc-link {
+      margin-left: 0;
+      margin-right: 0;
+      width: 100%;
+    }
+
+    /* h2: 기본 패딩 */
+    .toc-item.level-h2 .toc-link {
+      padding-left: 1rem;
+    }
+
+    /* h3: 폰트 크기와 색상만 조정, 너비는 동일 */
+    .toc-item.level-h3 .toc-link {
+      font-size: 0.85rem;
+      padding: 5px 12px 5px 1rem;
+      margin-top: 0;
+      margin-bottom: 0;
+      color: #c0c0c0;
+    }
+
+    .toc-item.level-h3 .toc-link:hover {
+      color: #e0e0e0;
+    }
+
+    /* h4: 폰트 크기와 색상만 조정, 너비는 동일 */
+    .toc-item.level-h4 .toc-link {
+      font-size: 0.8rem;
+      padding: 5px 12px 5px 1rem;
+      margin-top: 0;
+      margin-bottom: 0;
+      color: #a0a0a0;
+    }
+
+    .toc-item.level-h4 .toc-link:hover {
+      color: #d0d0d0;
+    }
+
+    /* Main Content Area */
+    .content-wrapper {
+      margin-left: 280px;
+      flex: 1;
       background: #999999;
       padding: 24px;
     }
 
     .container {
-      max-width: 1440px;
+      max-width: 1200px;
       margin: 0 auto;
       background: #f3f3f3;
       padding: 32px 32px 40px;
@@ -58,7 +279,7 @@ export default function apiGuide(req, res) {
 
     h3 {
       font-size: 1.05rem;
-      margin-top: 36px;
+      margin-top: 0px;
       margin-bottom: 8px;
     }
 
@@ -88,11 +309,11 @@ export default function apiGuide(req, res) {
       border-radius: 6px;
       padding: 20px 20px 24px;
       background: #ffffff;
-      margin-top: 100px;
+      margin-top: 50px;
     }
 
     .section-block:first-of-type {
-      margin-top: 100px;
+      margin-top: 50px;
     }
 
     .section-block > h2 {
@@ -235,8 +456,47 @@ export default function apiGuide(req, res) {
       margin-bottom: 0;
     }
 
+    /* Mobile: Hide sidebar, show toggle button */
+    .toc-toggle {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 1001;
+      background: #2b2b2b;
+      color: #ffffff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+
+    .toc-toggle:hover {
+      background: #3a3a3a;
+    }
+
+    @media (max-width: 1024px) {
+      .toc-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+
+      .toc-sidebar.open {
+        transform: translateX(0);
+      }
+
+      .content-wrapper {
+        margin-left: 0;
+      }
+
+      .toc-toggle {
+        display: block;
+      }
+    }
+
     @media (max-width: 768px) {
-      body {
+      .content-wrapper {
         padding: 12px;
       }
 
@@ -255,6 +515,20 @@ export default function apiGuide(req, res) {
       h2 {
         font-size: 1.15rem;
       }
+
+      .toc-sidebar {
+        width: 260px;
+      }
+    }
+
+    /* Smooth scroll */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Add scroll padding for fixed header offset */
+    html {
+      scroll-padding-top: 20px;
     }
 
     /* Resizable table (FAQ 전용) */
@@ -287,16 +561,46 @@ export default function apiGuide(req, res) {
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Financial Event API - 상세 사용 가이드</h1>
+  <!-- Mobile TOC Toggle Button -->
+  <button class="toc-toggle" onclick="document.querySelector('.toc-sidebar').classList.toggle('open')">
+    ☰
+  </button>
+
+  <div class="page-wrapper">
+    <!-- Table of Contents Sidebar -->
+    <nav class="toc-sidebar" id="toc">
+
+      <!-- Search Box -->
+      <div class="toc-search-box">
+        <input
+          type="text"
+          id="toc-search-input"
+          class="toc-search-input"
+          placeholder="검색..."
+          autocomplete="off"
+        />
+        <button id="toc-search-clear" class="toc-search-clear">×</button>
+      </div>
+      <div id="toc-search-result-count" class="toc-search-result-count"></div>
+
+      <ul class="toc-list" id="toc-list">
+        <!-- TOC will be generated by JavaScript -->
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+      <div class="container">
+        <h1 id="top">Financial Event API - 상세 사용 가이드</h1>
 
     <div class="section-intro">
-      <strong>API 개요:</strong> 이 API는 Financial Modeling Prep (FMP) API를 활용하여 기업 재무 이벤트 정보와 밸류에이션 지표를 제공합니다.
+      <p><strong>API 개요</strong></p>
+      이 API는 Financial Modeling Prep (FMP) API를 활용하여 기업 재무 이벤트 정보와 밸류에이션 지표를 제공합니다.<br>
       실시간 주가, 재무제표 기반 정량 지표, 애널리스트 목표가 등 포괄적인 투자 의사결정 정보를 JSON 형태로 제공합니다.
     </div>
 
     <section class="section-block">
-      <h2>설치 및 실행</h2>
+      <h2 id="installation">설치 및 실행</h2>
 
       <h3>필수 요구사항</h3>
       <ul>
@@ -314,16 +618,16 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
     </section>
 
     <section class="section-block">
-      <h2>API 엔드포인트 상세 설명</h2>
+      <h2 id="api-endpoints">API 엔드포인트 상세 설명</h2>
 
       <div class="endpoint">
-        <div class="endpoint-title">1. GET /getEvent - 재무 이벤트 조회</div>
+        <h3 class="endpoint-title">1. GET /getEvent - 재무 이벤트 조회</h3>
         <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/getEvent?startDate=3&endDate=7</code>
 
-        <h3>기능 설명</h3>
+        <h4>기능 설명</h4>
         <p>지정된 날짜 범위 내에 발생하는 기업 재무 이벤트(실적발표, 배당일 등)를 수집하여 반환합니다.</p>
 
-        <h3>데이터 수집 프로세스</h3>
+        <h4>데이터 수집 프로세스</h4>
         <ul>
           <li><strong>심볼 캐시 로드:</strong> 거래 가능한 주식 심볼 목록을 <code>docs/symbolCache.json</code>에서 로드 (자동 갱신)</li>
           <li><strong>API 호출:</strong> FMP API의 여러 이벤트 서비스(<code>earnings-calendar</code>, <code>dividend-calendar</code> 등)를 병렬 호출</li>
@@ -333,14 +637,14 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           <li><strong>캐싱:</strong> 결과를 <code>docs/getEventCache.json</code>에 저장</li>
         </ul>
 
-        <h3>요청 파라미터</h3>
+        <h4>요청 파라미터</h4>
         <ul>
           <li><code>startDate</code> (필수): 오늘로부터 N일 후 (예: 3 = 오늘+3일)</li>
           <li><code>endDate</code> (필수): 오늘로부터 N일 후 (예: 7 = 오늘+7일)</li>
           <li><code>format</code> (선택): "ndjson" 지정 시 NDJSON 스트리밍, 미지정 시 일반 JSON</li>
         </ul>
 
-        <h3>응답 구조</h3>
+        <h4>응답 구조</h4>
         <div class="response-info">
           <strong>JSON 응답 예시:</strong>
           <pre><code>{
@@ -361,7 +665,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
 }</code></pre>
         </div>
 
-        <h3>출력 필드 설명</h3>
+        <h4>출력 필드 설명</h4>
         <table class="metric-table">
           <thead>
             <tr>
@@ -399,20 +703,20 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       </div>
 
       <div class="endpoint">
-        <div class="endpoint-title">2. GET /getEventLatest - 캐시된 이벤트 조회</div>
+        <h3 class="endpoint-title">2. GET /getEventLatest - 캐시된 이벤트 조회</h3>
         <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/getEventLatest</code>
 
-        <h3>기능 설명</h3>
+        <h4>기능 설명</h4>
         <p>가장 최근에 <code>/getEvent</code>로 수집된 이벤트 캐시를 즉시 반환합니다. API 호출 없이 빠른 응답이 필요할 때 사용합니다.</p>
 
-        <h3>데이터 처리 프로세스</h3>
+        <h4>데이터 처리 프로세스</h4>
         <ul>
           <li><code>docs/getEventCache.json</code> 파일 읽기</li>
           <li>JSON 파싱 및 유효성 검증</li>
           <li>캐시 데이터 반환</li>
         </ul>
 
-        <h3>주의사항</h3>
+        <h4>주의사항</h4>
         <div class="note">
           <ul>
             <li>캐시 파일이 없으면 404 에러 반환 → 먼저 <code>/getEvent</code> 호출 필요</li>
@@ -423,13 +727,13 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       </div>
 
       <div class="endpoint">
-        <div class="endpoint-title">3. GET /getValuation - 밸류에이션 지표 계산</div>
+        <h3 class="endpoint-title">3. GET /getValuation - 밸류에이션 지표 계산</h3>
         <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/getValuation?tickers=AAPL,MSFT&cache=false</code>
 
-        <h3>기능 설명</h3>
+        <h4>기능 설명</h4>
         <p>지정된 종목의 현재가, 정량적 밸류에이션 지표, 동종업계 평균, 애널리스트 목표가를 종합적으로 계산하여 제공합니다.</p>
 
-        <h3>데이터 수집 및 계산 프로세스</h3>
+        <h4>데이터 수집 및 계산 프로세스</h4>
         <ul>
           <li><strong>현재가 조회:</strong> 장중에는 실시간 호가, 장외시간에는 Pre/Post Market API 사용</li>
           <li><strong>재무 데이터 수집:</strong> 최근 4분기 손익계산서 + 재무상태표 조회</li>
@@ -438,7 +742,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           <li><strong>정성 지표 수집:</strong> 애널리스트 컨센서스 목표가 및 통계 조회</li>
         </ul>
 
-        <h3>요청 파라미터</h3>
+        <h4>요청 파라미터</h4>
         <ul>
           <li><code>cache=false</code> 모드:
             <ul>
@@ -453,9 +757,9 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           </li>
         </ul>
 
-        <h3>정량적 지표 (Quantitative Metrics) - 계산 수식</h3>
+        <h4>정량적 지표 (Quantitative Metrics) - 계산 수식</h4>
 
-        <h4>밸류에이션 배수</h4>
+        <h5>밸류에이션 배수</h5>
         <table class="metric-table">
           <thead>
             <tr>
@@ -601,7 +905,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           </ul>
         </div>
 
-        <h3>Peer 정량 지표 (peerQuantitative)</h3>
+        <h4>Peer 정량 지표 (peerQuantitative)</h4>
         <div class="step-process">
           <strong>계산 프로세스:</strong>
           <ul>
@@ -614,7 +918,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           <strong>활용 방법:</strong> 대상 종목의 정량 지표와 비교하여 업종 내 상대적 위치 파악
         </div>
 
-        <h3>정성적 지표 (Qualitative Metrics)</h3>
+        <h4>정성적 지표 (Qualitative Metrics)</h4>
         <table class="metric-table">
           <thead>
             <tr>
@@ -645,7 +949,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           </tbody>
         </table>
 
-        <h3>Price (현재가)</h3>
+        <h4>Price (현재가)</h4>
         <div class="response-info">
           <strong>조회 로직:</strong>
           <ul>
@@ -655,7 +959,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           </ul>
         </div>
 
-        <h3>응답 구조 예시</h3>
+        <h4>응답 구조 예시</h4>
         <div class="response-info">
           <pre><code>{
   "meta": {
@@ -686,13 +990,13 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       </div>
 
       <div class="endpoint">
-        <div class="endpoint-title">4. GET /refreshAnalystLog - 애널리스트 로그 갱신</div>
+        <h3 class="endpoint-title">4. GET /refreshAnalystLog - 애널리스트 로그 갱신</h3>
         <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/refreshAnalystLog</code>
 
-        <h3>기능 설명</h3>
+        <h4>기능 설명</h4>
         <p>애널리스트 목표가 데이터를 수집하고, 과거 주가 추세(priceTrend)를 채워서 <code>docs/analystLog.json</code>을 생성/업데이트합니다.</p>
 
-        <h3>3단계 처리 프로세스</h3>
+        <h4>3단계 처리 프로세스</h4>
         <div class="step-process">
           <strong>1단계: priceTarget=true (애널리스트 목표가 수집)</strong>
           <ul>
@@ -715,7 +1019,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           </ul>
         </div>
 
-        <h3>요청 파라미터</h3>
+        <h4>요청 파라미터</h4>
         <ul>
           <li><code>priceTarget=true</code>: 1단계만 실행</li>
           <li><code>frame=true</code>: 2단계만 실행</li>
@@ -726,7 +1030,7 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
           <li><code>generateRating=false</code>: 완료 후 Rating 생성 생략</li>
         </ul>
 
-        <h3>출력 파일</h3>
+        <h4>출력 파일</h4>
         <ul>
           <li><code>docs/analystLog.json</code>: 애널리스트 목표가 + 과거 주가 추세 데이터</li>
           <li><code>docs/analystRating.json</code>: 생성된 등급 (generateRating=true 시)</li>
@@ -739,51 +1043,306 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       </div>
 
       <div class="endpoint">
-        <div class="endpoint-title">5. GET /generateRating - 애널리스트 등급 생성</div>
+        <h3 class="endpoint-title">5. GET /generateRating - 애널리스트 등급 생성</h3>
         <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/generateRating</code>
 
-        <h3>기능 설명</h3>
-        <p>기존 <code>analystLog.json</code>을 읽어서 애널리스트 등급 데이터(<code>analystRating.json</code>)를 생성합니다.
+        <h4>기능 설명</h4>
+        <p>기존 <code>analystLog.json</code>을 읽어서 애널리스트별 목표가 정확도와 가격 추이 통계를 계산합니다.
+        <strong>애널리스트 + 소속 회사</strong> 조합별로 D+1 ~ D+365일까지 각 시점의 괴리율(Gap Rate) 평균, 표준편차, 데이터 개수를 산출합니다.
         추가 API 호출 없이 캐시 데이터만 사용하므로 빠르고 Rate Limit 걱정이 없습니다.</p>
 
-        <h3>처리 프로세스</h3>
+        <h4>괴리율(Gap Rate) 정의</h4>
+        <div class="note">
+          <strong>gapRate(D+N) = (D+N 가격 / 리포트 시점 가격) - 1</strong>
+          <ul>
+            <li>양수(+): 리포트 발표 이후 주가 상승</li>
+            <li>음수(-): 리포트 발표 이후 주가 하락</li>
+            <li>예: gapRate(D+7) = 0.15 → 7일 후 15% 상승</li>
+            <li>예: gapRate(D+30) = -0.08 → 30일 후 8% 하락</li>
+          </ul>
+        </div>
+
+        <h4>처리 프로세스</h4>
         <ul>
-          <li><code>docs/analystLog.json</code> 읽기</li>
-          <li>목표가와 실제 주가 변동 비교</li>
-          <li>애널리스트 예측 정확도 평가</li>
-          <li><code>docs/analystRating.json</code> 저장</li>
+          <li><strong>1단계:</strong> <code>docs/analystLog.json</code>에서 모든 애널리스트 리포트 수집</li>
+          <li><strong>2단계:</strong> 애널리스트명 + 소속 회사 조합으로 고유 애널리스트 식별</li>
+          <li><strong>3단계:</strong> 각 애널리스트별로 모든 리포트의 D+N 괴리율 계산
+            <ul>
+              <li>D+1, D+2, D+3, ..., D+365 각 시점별 괴리율 수집</li>
+              <li>null 값은 제외하고 유효한 데이터만 통계 계산</li>
+            </ul>
+          </li>
+          <li><strong>4단계:</strong> 목표가 도달 시간(timeToTarget) 분석
+            <ul>
+              <li>목표가 ±2% 이내 도달한 첫 시점 기록</li>
+              <li>평균, 중간값, 사분위수 계산</li>
+              <li>목표가 도달률(reachedRatio) 산출</li>
+            </ul>
+          </li>
+          <li><strong>5단계:</strong> <code>docs/analystRating.json</code> 저장</li>
         </ul>
 
-        <h3>사용 시나리오</h3>
+        <h4>출력 데이터 구조</h4>
+        <div class="response-info">
+          <pre><code>{
+  "meta": {
+    "lastUpdated": "2025-11-27T05:02:42.729Z",
+    "analystCount": 76,
+    "horizons": [1, 2, 3, 4, 5, 6, 7, 14, 30, 60, 180, 365],
+    "description": "Gap rate = (D+N price / priceWhenPosted) - 1"
+  },
+  "analysts": {
+    "David Williams|Williams Trading": {
+      "analystName": "David Williams",
+      "analystCompany": "Williams Trading",
+      "priceTargetCount": 4,
+      "gapRates": {
+        "D1": {
+          "meanGapRate": 0.0042,
+          "stdGapRate": 0.067,
+          "count": 4,
+          "standardError": 0.0335,
+          "ci95Lower": -0.0614,
+          "ci95Upper": 0.0698,
+          "ci95Width": 0.1312
+        },
+        "D30": {
+          "meanGapRate": 0.3939,
+          "stdGapRate": 0.7991,
+          "count": 17,
+          "standardError": 0.1938,
+          "ci95Lower": 0.0140,
+          "ci95Upper": 0.7738,
+          "ci95Width": 0.7597
+        }
+      },
+      "timeToTarget": {
+        "mean": 45.2,
+        "median": 30,
+        "q25": 14,
+        "q75": 60,
+        "targetReachedCount": 12,
+        "totalTargets": 20,
+        "reachedRatio": 0.6
+      },
+      "accuracy": {
+        "mean": 0.98,
+        "std": 0.05,
+        "count": 12
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <h4>출력 필드 상세 설명</h4>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>필드</th>
+              <th>설명</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>analystName</code></td>
+              <td>애널리스트 이름</td>
+            </tr>
+            <tr>
+              <td><code>analystCompany</code></td>
+              <td>애널리스트 소속 회사 (증권사/리서치 기관)</td>
+            </tr>
+            <tr>
+              <td><code>priceTargetCount</code></td>
+              <td>해당 애널리스트가 발표한 총 목표가 리포트 개수</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].meanGapRate</code></td>
+              <td>D+N일 시점 평균 괴리율 (null 제외)</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].stdGapRate</code></td>
+              <td>D+N일 시점 괴리율 표준편차 (변동성 지표)</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].count</code></td>
+              <td>D+N일 시점 유효 데이터 개수</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].standardError</code></td>
+              <td>표준오차 (SE = σ / √n) - 평균의 불확실성 측정</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].ci95Lower</code></td>
+              <td>95% 신뢰구간 하한 (mean - 1.96 × SE)</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].ci95Upper</code></td>
+              <td>95% 신뢰구간 상한 (mean + 1.96 × SE)</td>
+            </tr>
+            <tr>
+              <td><code>gapRates.D[N].ci95Width</code></td>
+              <td>95% 신뢰구간 폭 (상한 - 하한) - 작을수록 신뢰도 높음</td>
+            </tr>
+            <tr>
+              <td><code>timeToTarget.mean</code></td>
+              <td>목표가 도달까지 평균 일수</td>
+            </tr>
+            <tr>
+              <td><code>timeToTarget.median</code></td>
+              <td>목표가 도달까지 중간값 일수</td>
+            </tr>
+            <tr>
+              <td><code>timeToTarget.q25 / q75</code></td>
+              <td>25% / 75% 사분위수 (분포 파악)</td>
+            </tr>
+            <tr>
+              <td><code>timeToTarget.reachedRatio</code></td>
+              <td>목표가 도달률 (0~1, 1 = 100% 도달)</td>
+            </tr>
+            <tr>
+              <td><code>accuracy.mean</code></td>
+              <td>목표가 정확도 평균 (실제가/목표가)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>통계적 신뢰도 이해하기</h4>
+        <div class="note">
+          <strong>표준편차(σ) vs 표준오차(SE)의 차이:</strong>
+          <ul>
+            <li><strong>표준편차 (stdGapRate)</strong>: 개별 관측값의 흩어짐 정도
+              <ul>
+                <li>애널리스트 예측의 변동성을 나타냄</li>
+                <li>높을수록 예측이 불안정 (어떤 종목은 맞고, 어떤 종목은 틀림)</li>
+              </ul>
+            </li>
+            <li><strong>표준오차 (standardError = σ / √n)</strong>: 평균의 불확실성
+              <ul>
+                <li>샘플 개수(n)가 증가하면 SE는 감소 (√n에 반비례)</li>
+                <li>낮을수록 평균 추정이 정확함</li>
+              </ul>
+            </li>
+          </ul>
+
+          <strong>95% 신뢰구간(CI) 해석:</strong>
+          <ul>
+            <li><strong>의미:</strong> 진짜 평균 괴리율이 이 구간 안에 있을 확률 95%</li>
+            <li><strong>계산:</strong> 평균 ± 1.96 × SE</li>
+            <li><strong>예시:</strong> D+30 meanGapRate = 39.39%, CI = [1.40%, 77.38%]
+              <ul>
+                <li>→ 30일 후 진짜 평균 수익률이 1.4%~77.4% 사이일 확률 95%</li>
+                <li>→ CI 폭이 75.97%로 넓음 = 불확실성 높음</li>
+              </ul>
+            </li>
+          </ul>
+
+          <strong>샘플 개수(count)의 중요성:</strong>
+          <table class="metric-table">
+            <thead>
+              <tr>
+                <th>샘플 수(n)</th>
+                <th>표준편차(σ)</th>
+                <th>표준오차(SE)</th>
+                <th>95% CI 폭</th>
+                <th>신뢰도</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>5개</td>
+                <td>30%</td>
+                <td>13.4%</td>
+                <td>±26.4%</td>
+                <td>낮음</td>
+              </tr>
+              <tr>
+                <td>10개</td>
+                <td>30%</td>
+                <td>9.5%</td>
+                <td>±18.6%</td>
+                <td>보통</td>
+              </tr>
+              <tr>
+                <td>40개</td>
+                <td>30%</td>
+                <td>4.7%</td>
+                <td>±9.3%</td>
+                <td>높음</td>
+              </tr>
+              <tr>
+                <td>100개</td>
+                <td>30%</td>
+                <td>3.0%</td>
+                <td>±5.9%</td>
+                <td>매우 높음</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>⚠️ <strong>핵심:</strong> 표준편차가 크면(변동성 높음) 더 많은 샘플이 필요하고,<br>
+          샘플 개수가 증가할수록 CI 폭이 √n에 비례하여 빠르게 감소합니다.</p>
+        </div>
+
+        <h4>활용 방법</h4>
+        <div class="step-process">
+          <strong>1. 신뢰할 수 있는 애널리스트 식별:</strong>
+          <ul>
+            <li><code>priceTargetCount</code>가 높고 (충분한 샘플, 최소 10개 이상)</li>
+            <li><code>ci95Width</code>가 좁으며 (신뢰구간 폭 < 20% 권장)</li>
+            <li><code>gapRates.D[N].stdGapRate</code>가 낮고 (일관성, < 30% 권장)</li>
+            <li><code>timeToTarget.reachedRatio</code>가 높은 (목표가 실현율 > 60%) 애널리스트 선별</li>
+          </ul>
+
+          <strong>2. 기대 수익률 예측 (신뢰구간 활용):</strong>
+          <ul>
+            <li><strong>보수적 시나리오:</strong> ci95Lower 사용 (95% 확률로 최소 이 정도 수익)</li>
+            <li><strong>기대 시나리오:</strong> meanGapRate 사용 (평균 수익)</li>
+            <li><strong>낙관적 시나리오:</strong> ci95Upper 사용 (95% 확률로 최대 이 정도 수익)</li>
+            <li><strong>예:</strong> D+7 CI = [2%, 14%], mean = 8%
+              <ul>
+                <li>보수적: 최소 2% 수익 기대</li>
+                <li>기대: 평균 8% 수익 기대</li>
+                <li>낙관적: 최대 14% 수익 기대</li>
+              </ul>
+            </li>
+          </ul>
+
+          <strong>3. 신뢰도 기반 포지션 크기 조정:</strong>
+          <ul>
+            <li><code>ci95Width</code>가 좁으면 (< 10%) → 큰 포지션 허용</li>
+            <li><code>ci95Width</code>가 넓으면 (> 50%) → 작은 포지션 또는 제외</li>
+            <li><code>count</code>가 적으면 (< 5) → 통계적으로 신뢰하기 어려움</li>
+          </ul>
+
+          <strong>4. 포지션 기간 결정:</strong>
+          <ul>
+            <li><code>timeToTarget.median</code>으로 목표가 도달 예상 기간 파악</li>
+            <li>예: median = 30일 → 30일 이내 목표가 도달 가능성 50%</li>
+            <li>q25~q75 범위로 보수적/공격적 시나리오 수립</li>
+          </ul>
+        </div>
+
+        <h4>사용 시나리오</h4>
         <ul>
           <li><code>/refreshAnalystLog</code> 완료 후 Rating만 재생성하고 싶을 때</li>
           <li>Rating 계산 로직 변경 후 재계산</li>
           <li>API 호출 없이 빠른 결과 확인</li>
+          <li>애널리스트 성과 백테스팅 및 랭킹 산출</li>
         </ul>
+
+        <div class="note">
+          <strong>통계적 유의성 주의:</strong>
+          <ul>
+            <li><code>count</code>가 너무 작으면(< 5) 통계적으로 신뢰하기 어려움</li>
+            <li>특정 섹터/종목에만 집중된 애널리스트는 편향 가능성</li>
+            <li>과거 성과가 미래를 보장하지 않음 (시장 환경 변화 고려)</li>
+          </ul>
+        </div>
       </div>
     </section>
 
     <section class="section-block">
-      <h2>테스트 실행</h2>
-      <pre><code>npm test                    # 전체 테스트
-npm run test:unit           # 단위 테스트
-npm run test:integration    # 통합 테스트
-npm run test:contract       # 계약 테스트
-npm run test:coverage       # 커버리지 리포트</code></pre>
-    </section>
-
-    <section class="section-block">
-      <h2>문제 해결</h2>
-      <ul>
-        <li><strong>503 Service Unavailable:</strong> <code>docs/</code> 디렉토리에 캐시 파일 존재 확인</li>
-        <li><strong>401 Unauthorized:</strong> <code>.env</code> 파일의 <code>FMP_API_KEY</code> 유효성 확인</li>
-        <li><strong>빈 응답:</strong> 응답 내 <code>collectionErrorChecklist</code> 확인</li>
-        <li><strong>Rate Limit 초과:</strong> <code>/getEventLatest</code>, <code>/generateRating</code> 등 캐시 기반 API 사용</li>
-      </ul>
-    </section>
-
-    <section class="section-block">
-      <h2>프로젝트 구조 및 설정 파일</h2>
+      <h2 id="project-structure">프로젝트 구조 및 설정 파일</h2>
 
       <h3>디렉토리 구조 개요</h3>
       <pre><code>getEvents/
@@ -806,6 +1365,390 @@ npm run test:coverage       # 커버리지 리포트</code></pre>
 │   ├── analystLog.json         # 애널리스트 목표가 로그
 │   └── analystRating.json      # 애널리스트 등급 데이터
 └── .env                        # 환경 변수 (FMP_API_KEY)</code></pre>
+
+      <h3 id="endpoint-details">엔드포인트별 상세 구조 및 데이터 흐름</h3>
+
+      <div class="note">
+      <h4 id="endpoint-getEvent">1️⃣ GET /getEvent - 재무 이벤트 수집</h4><br>
+        <strong>📍 엔드포인트 파일:</strong> <code>src/api/endpoints/getEvent.js</code><br><br>
+        <strong>📊 데이터 흐름:</strong>
+        <pre><code>1. 요청 파라미터 검증
+   ↓ src/lib/dateUtils.js → validateDateRange()
+   ↓ startDate, endDate를 ISO 8601 날짜로 변환
+
+2. 심볼 캐시 로드 (거래 가능 종목 목록)
+   ↓ src/services/cacheManager.js → getSymbolCache()
+   ↓ docs/symbolCache.json 읽기 (없으면 FMP API 호출)
+
+3. API 설정 로드
+   ↓ src/lib/configLoader.js → loadApiList()
+   ↓ docs/config/ApiList.json 읽기
+   ↓ getCalendar.getEarningsCalendar, getDividendCalendar 등
+
+4. 이벤트 서비스 병렬 호출
+   ↓ src/services/fmpClient.js → fetchApi()
+   ↓ FMP API: /v3/earning-calendar, /v3/stock-dividend-calendar 등
+   ↓ axios + axios-retry (최대 3회 재시도)
+
+5. 응답 데이터 정규화
+   ↓ src/services/eventNormalizer.js → normalizeEvents()
+   ↓ fieldMap 기반 필드 매핑 (symbol → ticker)
+   ↓ 날짜 UTC 변환, 고정값 처리
+
+6. 심볼 필터링 및 중복 제거
+   ↓ src/services/eventNormalizer.js → filterEventsBySymbols()
+   ↓ symbolCache에 없는 종목 제외
+   ↓ deduplicateEvents() → ticker + date + event 중복 제거
+
+7. 응답 포맷 선택
+   ↓ format=ndjson → src/lib/ndJsonStreamer.js
+   ↓ format=json → 일반 JSON 배열
+
+8. 캐시 저장
+   ↓ src/services/cacheManager.js → saveEventCache()
+   ↓ docs/getEventCache.json 쓰기</code></pre>
+
+        <strong>🗂️ 관련 파일:</strong>
+        <ul>
+          <li><code>src/api/endpoints/getEvent.js</code> - 엔드포인트 핸들러 (메인)</li>
+          <li><code>src/services/cacheManager.js</code> - 캐시 관리 (getSymbolCache, saveEventCache)</li>
+          <li><code>src/services/fmpClient.js</code> - FMP API 호출 (fetchApi, axios-retry)</li>
+          <li><code>src/services/eventNormalizer.js</code> - 데이터 정규화 (normalizeEvents, deduplicateEvents)</li>
+          <li><code>src/lib/configLoader.js</code> - 설정 로드 (loadApiList, buildApiUrl)</li>
+          <li><code>src/lib/dateUtils.js</code> - 날짜 유틸 (validateDateRange, daysFromTodayToISO)</li>
+          <li><code>src/lib/ndJsonStreamer.js</code> - NDJSON 스트리밍 (initNDJsonStream, writeNDJsonLine)</li>
+          <li><code>docs/config/ApiList.json</code> - API 서비스 정의 및 fieldMap</li>
+          <li><code>docs/symbolCache.json</code> - 거래 가능 종목 목록 (읽기)</li>
+          <li><code>docs/getEventCache.json</code> - 이벤트 캐시 (쓰기)</li>
+        </ul>
+
+        <strong>⚙️ 외부 API 의존성:</strong>
+        <ul>
+          <li>FMP <code>/v3/earning-calendar</code> - 실적발표 일정</li>
+          <li>FMP <code>/v3/stock-dividend-calendar</code> - 배당 일정</li>
+          <li>FMP <code>/v3/stock-split-calendar</code> - 주식분할 일정</li>
+          <li>FMP <code>/v3/stock/list</code> - 전체 종목 목록 (캐시 갱신 시)</li>
+        </ul>
+      </div>
+
+      <div class="note">
+      <h4 id="endpoint-getEventLatest">2️⃣ GET /getEventLatest - 캐시 이벤트 조회</h4><br>
+        <strong>📍 엔드포인트 파일:</strong> <code>src/api/endpoints/getEventLatest.js</code><br><br>
+        <strong>📊 데이터 흐름:</strong>
+        <pre><code>1. 캐시 파일 읽기
+   ↓ src/services/cacheManager.js → loadEventCache()
+   ↓ docs/getEventCache.json 읽기
+
+2. 파일 존재 여부 검증
+   ↓ 없으면 404 에러 (GET_EVENT_CACHE_NOT_AVAILABLE)
+   ↓ 파싱 실패 시 503 에러 (CACHE_FILE_CORRUPTED)
+
+3. JSON 응답 반환
+   ↓ res.json(cachedData)</code></pre>
+
+        <strong>🗂️ 관련 파일:</strong>
+        <ul>
+          <li><code>src/api/endpoints/getEventLatest.js</code> - 엔드포인트 핸들러 (메인)</li>
+          <li><code>src/services/cacheManager.js</code> - 캐시 로드 (loadEventCache)</li>
+          <li><code>docs/getEventCache.json</code> - 이벤트 캐시 (읽기 전용)</li>
+        </ul>
+
+        <strong>⚠️ 주의사항:</strong>
+        <ul>
+          <li>API 호출 없음 - 순수 파일 시스템 읽기</li>
+          <li>최초 실행 시 반드시 <code>/getEvent</code> 먼저 호출 필요</li>
+          <li>캐시 데이터는 마지막 <code>/getEvent</code> 호출 시점의 스냅샷</li>
+        </ul>
+      </div>
+      
+      <div class="note">
+      <h4 id="endpoint-getValuation">3️⃣ GET /getValuation - 밸류에이션 계산</h4><br>
+        <strong>📍 엔드포인트 파일:</strong> <code>src/api/endpoints/getValuation.js</code><br><br>
+        <strong>📊 데이터 흐름:</strong>
+        <pre><code>1. 티커 목록 결정
+   ↓ cache=true → docs/getEventCache.json에서 추출
+   ↓ cache=false → tickers 파라미터 파싱
+
+2. 각 티커별 현재가 조회
+   ↓ src/services/priceService.js → getCurrentPrice()
+   ↓ src/lib/marketHours.js → isMarketOpen() (장중 판단)
+   ↓ 장중: FMP /v3/quote/{ticker}
+   ↓ 장외: FMP /v4/pre-post-market/{ticker}
+
+3. 정량적 지표 계산
+   ↓ src/services/valuationCalculator.js → calculateQuantitativeValuation()
+   ↓ FMP /v3/income-statement/{ticker}?period=quarter&limit=4
+   ↓ FMP /v3/balance-sheet-statement/{ticker}?period=quarter&limit=4
+   ↓ src/lib/valuationHelpers.js → 지표 계산 로직
+   ↓ PBR, PSR, PER, ROE, GrossMargin, OperatingMargin 등
+
+4. Peer 정량 지표 계산
+   ↓ src/services/peerEvaluationService.js → calculatePeerQuantitative()
+   ↓ FMP /v3/stock-peers?symbol={ticker}
+   ↓ 각 Peer에 대해 정량 지표 계산 (3단계 반복)
+   ↓ 평균값 산출 (null 제외)
+
+5. 정성적 지표 수집
+   ↓ src/services/qualitativeCalculator.js → calculateQualitativeValuation()
+   ↓ FMP /v4/price-target-consensus?symbol={ticker}
+   ↓ FMP /v4/price-target-summary?symbol={ticker}
+   ↓ ConsensusTargetPrice, PriceTargetSummary
+
+6. 응답 조합
+   ↓ { ticker, price, quantitative, peerQuantitative, qualitative }</code></pre>
+
+        <strong>🗂️ 관련 파일:</strong>
+        <ul>
+          <li><code>src/api/endpoints/getValuation.js</code> - 엔드포인트 핸들러 (메인)</li>
+          <li><code>src/services/priceService.js</code> - 현재가 조회 (getCurrentPrice)</li>
+          <li><code>src/services/valuationCalculator.js</code> - 정량 지표 계산 (calculateQuantitativeValuation)</li>
+          <li><code>src/services/peerEvaluationService.js</code> - Peer 분석 (calculatePeerQuantitative)</li>
+          <li><code>src/services/qualitativeCalculator.js</code> - 정성 지표 수집 (calculateQualitativeValuation)</li>
+          <li><code>src/services/fmpClient.js</code> - FMP API 호출 (fetchApi)</li>
+          <li><code>src/lib/valuationHelpers.js</code> - 지표 계산 헬퍼 (ttmFromQuarterSumOrScaled 등)</li>
+          <li><code>src/lib/marketHours.js</code> - 장중/장외 판단 (isMarketOpen)</li>
+          <li><code>src/lib/configLoader.js</code> - API 설정 로드</li>
+          <li><code>docs/config/evMethod.json</code> - 지표 계산 공식 정의</li>
+          <li><code>docs/getEventCache.json</code> - 티커 목록 소스 (cache=true 시)</li>
+        </ul>
+
+        <strong>⚙️ 외부 API 의존성 (티커당):</strong>
+        <ul>
+          <li>FMP <code>/v3/quote/{ticker}</code> - 실시간 호가 (장중)</li>
+          <li>FMP <code>/v4/pre-post-market/{ticker}</code> - 프리/포스트 마켓 (장외)</li>
+          <li>FMP <code>/v3/income-statement/{ticker}</code> - 손익계산서 (4분기)</li>
+          <li>FMP <code>/v3/balance-sheet-statement/{ticker}</code> - 재무상태표 (4분기)</li>
+          <li>FMP <code>/v3/stock-peers?symbol={ticker}</code> - Peer 목록</li>
+          <li>FMP <code>/v4/price-target-consensus?symbol={ticker}</code> - 애널리스트 컨센서스</li>
+          <li>FMP <code>/v4/price-target-summary?symbol={ticker}</code> - 목표가 통계</li>
+        </ul>
+
+        <strong>📈 계산 복잡도:</strong>
+        <ul>
+          <li>티커 1개 = 약 7~10개 API 호출</li>
+          <li>Peer 분석 포함 시 = (1 + Peer 수) × 4개 API 호출 추가</li>
+          <li>예: 티커 1개 + Peer 3개 = 최대 22~26개 API 호출</li>
+        </ul>
+      </div>
+
+      <div class="note">
+      <h4 id="endpoint-refreshAnalystLog">4️⃣ GET /refreshAnalystLog - 애널리스트 로그 갱신</h4><br>
+        <strong>📍 엔드포인트 파일:</strong> <code>src/api/endpoints/refreshAnalystLog.js</code><br><br>
+        <strong>📊 데이터 흐름 (3단계 파이프라인):</strong>
+        <pre><code>📍 Step 1: priceTarget=true (애널리스트 목표가 수집)
+   ↓ src/services/analystCacheManager.js → refreshPriceTarget()
+   ↓ docs/symbolCache.json 읽기 (티커 목록)
+   ↓ 각 티커별 FMP /v3/analyst-estimates/{ticker} 호출
+   ↓ 기존 docs/analystLog.json과 병합 (publishedDate 기준)
+   ↓ 새 레코드만 추가, 기존 데이터 보존
+
+📍 Step 2: frame=true (priceTrend 구조 초기화)
+   ↓ src/services/analystCacheManager.js → initializePriceTrendFrame()
+   ↓ docs/analystLog.json 읽기
+   ↓ priceTrend 필드 없는 레코드 탐지
+   ↓ D1~D365 null 값으로 초기화
+   ↓ { D1: null, D2: null, ..., D365: null }
+
+📍 Step 3: quote=true (과거 주가 데이터 채우기)
+   ↓ src/services/analystCacheManager.js → fillPriceTrendQuotes()
+   ↓ 각 레코드의 publishedDate 기준
+   ↓ D+N일 날짜 계산 (예: publishedDate + 30일 = D30 날짜)
+   ↓ FMP /v3/historical-price-full/{ticker}?from={date}&to={date+7}
+   ↓ 7일 윈도우로 시장 휴무 대응
+   ↓ priceTrend의 null 값만 채우기 (기존 값 보존)</code></pre>
+
+        <strong>🗂️ 관련 파일:</strong>
+        <ul>
+          <li><code>src/api/endpoints/refreshAnalystLog.js</code> - 엔드포인트 핸들러 (메인)</li>
+          <li><code>src/services/analystCacheManager.js</code> - 3단계 파이프라인 오케스트레이션
+            <ul>
+              <li><code>refreshPriceTarget()</code> - Step 1 실행</li>
+              <li><code>initializePriceTrendFrame()</code> - Step 2 실행</li>
+              <li><code>fillPriceTrendQuotes()</code> - Step 3 실행</li>
+              <li><code>refreshAnalystLog()</code> - 전체 오케스트레이터</li>
+            </ul>
+          </li>
+          <li><code>src/services/cacheManager.js</code> - symbolCache 로드</li>
+          <li><code>src/services/fmpClient.js</code> - FMP API 호출</li>
+          <li><code>src/lib/configLoader.js</code> - API 설정 로드</li>
+          <li><code>src/lib/dateUtils.js</code> - 날짜 계산 (D+N)</li>
+          <li><code>docs/symbolCache.json</code> - 티커 목록 (읽기)</li>
+          <li><code>docs/analystLog.json</code> - 애널리스트 로그 (읽기/쓰기)</li>
+        </ul>
+
+        <strong>⚙️ 외부 API 의존성:</strong>
+        <ul>
+          <li>FMP <code>/v3/analyst-estimates/{ticker}</code> - 애널리스트 목표가 (Step 1)</li>
+          <li>FMP <code>/v3/historical-price-full/{ticker}</code> - 과거 주가 (Step 3)</li>
+        </ul>
+
+        <strong>🔄 실행 모드:</strong>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>파라미터</th>
+              <th>실행 단계</th>
+              <th>용도</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>파라미터 없음</td>
+              <td>Step 1 → 2 → 3</td>
+              <td>전체 파이프라인 실행 (기본값)</td>
+            </tr>
+            <tr>
+              <td><code>priceTarget=true</code></td>
+              <td>Step 1만</td>
+              <td>신규 목표가만 수집</td>
+            </tr>
+            <tr>
+              <td><code>frame=true</code></td>
+              <td>Step 2만</td>
+              <td>priceTrend 구조 초기화</td>
+            </tr>
+            <tr>
+              <td><code>quote=true</code></td>
+              <td>Step 3만</td>
+              <td>누락된 주가 데이터 채우기</td>
+            </tr>
+            <tr>
+              <td><code>tickers=AAPL,MSFT</code></td>
+              <td>지정 티커만</td>
+              <td>특정 종목 처리</td>
+            </tr>
+            <tr>
+              <td><code>test=true</code></td>
+              <td>상위 10개만</td>
+              <td>테스트용 소량 실행</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <strong>📊 데이터 구조 예시:</strong>
+        <pre><code>{
+  "meta": { "lastUpdated": "2025-11-27T...", "step": "fillQuotes" },
+  "analysts": {
+    "AAPL": [
+      {
+        "symbol": "AAPL",
+        "publishedDate": "2025-10-15T...",
+        "analystName": "John Doe",
+        "analystCompany": "Goldman Sachs",
+        "priceTarget": 195,
+        "priceWhenPosted": 189,
+        "priceTrend": {
+          "D1": 190.5,
+          "D7": 192.3,
+          "D30": 198.1,
+          "D365": null  // 아직 365일이 경과하지 않음
+        }
+      }
+    ]
+  }
+}</code></pre>
+      </div>
+      
+      <div class="note">
+      <h4 id="endpoint-generateRating">5️⃣ GET /generateRating - 애널리스트 등급 생성</h4><br>
+        <strong>📍 엔드포인트 파일:</strong> <code>src/api/endpoints/generateRating.js</code><br><br>
+        <strong>📊 데이터 흐름:</strong>
+        <pre><code>1. 애널리스트 로그 로드
+   ↓ src/services/analystCacheManager.js → loadAnalystLog()
+   ↓ docs/analystLog.json 읽기
+
+2. 애널리스트 식별 및 그룹핑
+   ↓ analystName + analystCompany 조합으로 고유 키 생성
+   ↓ "John Doe|Goldman Sachs"
+
+3. D+N 괴리율 계산
+   ↓ 각 레코드별 gapRate = (D+N price / priceWhenPosted) - 1
+   ↓ D1, D2, ..., D365 각 시점별 계산
+   ↓ null 값 제외
+
+4. 통계 산출 (각 D+N별)
+   ↓ calculateStats() 함수 실행
+   ↓ - meanGapRate: 평균 괴리율
+   ↓ - stdGapRate: 표준편차 (변동성)
+   ↓ - standardError: σ / √n (평균의 불확실성)
+   ↓ - ci95Lower: mean - 1.96×SE (95% 신뢰구간 하한)
+   ↓ - ci95Upper: mean + 1.96×SE (95% 신뢰구간 상한)
+   ↓ - ci95Width: 신뢰구간 폭 (좁을수록 신뢰도↑)
+
+5. timeToTarget 분석
+   ↓ 목표가 ±2% 이내 도달한 첫 시점 탐지
+   ↓ calculateQuantile() 함수로 25%, 50%, 75% 분위수 계산
+   ↓ reachedRatio: 목표가 도달률
+
+6. 정확도 메트릭
+   ↓ accuracy = actualPrice / targetPrice
+   ↓ 평균 및 표준편차 계산
+
+7. 결과 저장
+   ↓ src/services/analystCacheManager.js → writeFile()
+   ↓ docs/analystRating.json 쓰기</code></pre>
+
+        <strong>🗂️ 관련 파일:</strong>
+        <ul>
+          <li><code>src/api/endpoints/generateRating.js</code> - 엔드포인트 핸들러 (메인)</li>
+          <li><code>src/services/analystCacheManager.js</code> - 등급 생성 로직
+            <ul>
+              <li><code>generateAnalystRating()</code> - 메인 함수</li>
+              <li><code>calculateStats()</code> - 통계 계산 (mean, std, SE, CI)</li>
+              <li><code>calculateQuantile()</code> - 분위수 계산</li>
+              <li><code>loadAnalystLog()</code> - 로그 로드</li>
+            </ul>
+          </li>
+          <li><code>src/lib/dateUtils.js</code> - 타임스탬프 생성</li>
+          <li><code>docs/analystLog.json</code> - 입력 데이터 (읽기 전용)</li>
+          <li><code>docs/analystRating.json</code> - 출력 데이터 (쓰기)</li>
+        </ul>
+
+        <strong>⚡ 성능 특성:</strong>
+        <ul>
+          <li><strong>API 호출: 0개</strong> - 순수 로컬 계산</li>
+          <li>처리 시간: 일반적으로 < 100ms</li>
+          <li>Rate Limit 영향: 없음</li>
+          <li>캐시 기반 처리로 빠른 반복 실행 가능</li>
+        </ul>
+
+        <strong>📊 계산 공식:</strong>
+        <ul>
+          <li><strong>Gap Rate:</strong> <code>(D+N price / priceWhenPosted) - 1</code></li>
+          <li><strong>Standard Error:</strong> <code>σ / √n</code></li>
+          <li><strong>95% CI:</strong> <code>mean ± 1.96 × SE</code></li>
+          <li><strong>Reached Ratio:</strong> <code>targetReachedCount / totalTargets</code></li>
+        </ul>
+
+        <strong>💾 출력 파일 구조:</strong>
+        <pre><code>{
+  "meta": {
+    "analystCount": 76,
+    "horizons": [1, 2, 3, ..., 365],
+    "description": "Gap rate = (D+N price / priceWhenPosted) - 1"
+  },
+  "analysts": {
+    "John Doe|Goldman Sachs": {
+      "analystName": "John Doe",
+      "analystCompany": "Goldman Sachs",
+      "priceTargetCount": 15,
+      "gapRates": {
+        "D30": {
+          "meanGapRate": 0.0842,
+          "stdGapRate": 0.1523,
+          "count": 15,
+          "standardError": 0.0393,
+          "ci95Lower": 0.0070,
+          "ci95Upper": 0.1614,
+          "ci95Width": 0.1544
+        }
+      },
+      "timeToTarget": { ... },
+      "accuracy": { ... }
+    }
+  }
+}</code></pre>
+      </div>
 
       <h3>1. API 엔드포인트 (src/api/endpoints/)</h3>
       <table class="metric-table metric-table--resizable" id="api-endpoints-table">
@@ -1161,7 +2104,7 @@ npm run test:coverage       # 커버리지 리포트</code></pre>
     </section>
 
     <section class="section-block">
-      <h2>추가 리소스</h2>
+      <h2 id="resources">추가 리소스</h2>
 
       <h3>FMP API 주요 엔드포인트</h3>
       <table class="metric-table metric-table--resizable" id="major-endpoints-table">
@@ -1295,9 +2238,271 @@ npm run test:coverage       # 커버리지 리포트</code></pre>
       </table>
 
     </section>
-</div>
-</body>
+      </div><!-- /.container -->
+    </div><!-- /.content-wrapper -->
+  </div><!-- /.page-wrapper -->
 
+  <script>
+    // Generate Table of Contents from headings
+    (function() {
+      const tocList = document.getElementById('toc-list');
+      const container = document.querySelector('.container');
+      // h1 제외하고 h2부터 출력
+      const headings = container.querySelectorAll('h2, h3, h4');
+
+      // 계층 구조로 변환: 상위 위계 항목이 하위 위계 항목들을 포함
+      function createTOCItem(item) {
+        const li = document.createElement('li');
+        li.className = 'toc-item level-' + item.level;
+
+        // 외부 박스 (호버/선택 상태 표시용)
+        const a = document.createElement('a');
+        a.href = '#' + item.id;
+        a.className = 'toc-link';
+        a.textContent = item.text;
+
+        // Click handler for mobile: close sidebar after clicking
+        a.addEventListener('click', function() {
+          if (window.innerWidth <= 1024) {
+            document.querySelector('.toc-sidebar').classList.remove('open');
+          }
+        });
+
+        li.appendChild(a);
+        return li;
+      }
+
+      // 계층 구조 생성
+      const stack = []; // 상위 항목들을 추적하는 스택
+      const rootItems = []; // 최상위 항목들
+      
+      headings.forEach((heading, index) => {
+        const level = heading.tagName.toLowerCase();
+        const levelNum = parseInt(level.charAt(1));
+
+        // Create ID for heading if it doesn't have one
+        if (!heading.id) {
+          heading.id = 'section-' + index;
+        }
+
+        const item = {
+          heading: heading,
+          level: level,
+          levelNum: levelNum,
+          text: heading.textContent,
+          id: heading.id,
+          children: []
+        };
+
+        // 스택에서 현재 항목보다 상위인 항목들을 제거
+        while (stack.length > 0 && stack[stack.length - 1].levelNum >= levelNum) {
+          stack.pop();
+        }
+
+        // 상위 항목이 있으면 하위 항목으로 추가
+        if (stack.length > 0) {
+          stack[stack.length - 1].children.push(item);
+        } else {
+          // 최상위 항목이면 루트에 추가
+          rootItems.push(item);
+        }
+
+        // 현재 항목을 스택에 추가
+        stack.push(item);
+      });
+
+      // 계층 구조를 DOM으로 변환
+      function renderTOCItem(item, parentList) {
+        const li = createTOCItem(item);
+        
+        // 하위 항목이 있으면 박스로 묶기
+        if (item.children.length > 0) {
+          const childBox = document.createElement('ul');
+          childBox.className = 'toc-group-box toc-group-' + item.level;
+          
+          item.children.forEach(child => {
+            renderTOCItem(child, childBox);
+          });
+          
+          li.appendChild(childBox);
+        }
+        
+        parentList.appendChild(li);
+      }
+
+      // 루트 항목들을 렌더링
+      rootItems.forEach(item => {
+        renderTOCItem(item, tocList);
+      });
+
+      // Highlight active section on scroll
+      function updateActiveTOC() {
+        const scrollPosition = window.scrollY + 100; // Offset for better UX
+
+        headings.forEach((heading) => {
+          const section = heading;
+          const link = document.querySelector('.toc-link[href="#' + heading.id + '"]');
+
+          if (!link) return;
+
+          if (section.offsetTop <= scrollPosition &&
+              section.offsetTop + section.offsetHeight > scrollPosition) {
+            // Remove active from all
+            document.querySelectorAll('.toc-link').forEach(l => l.classList.remove('active'));
+            // Add active to current
+            link.classList.add('active');
+          }
+        });
+      }
+
+      // Update on scroll
+      window.addEventListener('scroll', updateActiveTOC);
+      // Initial update
+      updateActiveTOC();
+
+      // ===== Search Functionality =====
+      const searchInput = document.getElementById('toc-search-input');
+      const searchClear = document.getElementById('toc-search-clear');
+      const searchResultCount = document.getElementById('toc-search-result-count');
+      const allTocItems = Array.from(document.querySelectorAll('.toc-item'));
+
+      // Store original text content for searching (title + body content)
+      allTocItems.forEach(item => {
+        const link = item.querySelector('.toc-link');
+        if (link && link.hash) {
+          const targetId = link.hash.substring(1);
+          const targetElement = document.getElementById(targetId);
+
+          if (targetElement) {
+            // Get title text
+            const titleText = link.textContent.toLowerCase();
+
+            // Get body content under this section
+            let bodyText = '';
+            let currentElement = targetElement.nextElementSibling;
+
+            // Collect text until next heading of same or higher level
+            const targetLevel = parseInt(targetElement.tagName.charAt(1));
+
+            while (currentElement) {
+              const currentLevel = currentElement.tagName.match(/^H([1-6])$/);
+
+              if (currentLevel && parseInt(currentLevel[1]) <= targetLevel) {
+                break;
+              }
+
+              bodyText += ' ' + currentElement.textContent.toLowerCase();
+              currentElement = currentElement.nextElementSibling;
+            }
+
+            item.dataset.searchText = titleText + bodyText;
+          } else {
+            item.dataset.searchText = link.textContent.toLowerCase();
+          }
+        }
+      });
+
+      function filterTOC(searchTerm) {
+        const term = searchTerm.toLowerCase().trim();
+
+        // Show/hide clear button
+        if (term) {
+          searchClear.classList.add('show');
+        } else {
+          searchClear.classList.remove('show');
+        }
+
+        // If search is empty, show all items
+        if (!term) {
+          allTocItems.forEach(item => {
+            item.style.display = '';
+          });
+          // Show all group boxes
+          document.querySelectorAll('.toc-group-box').forEach(box => {
+            box.style.display = '';
+          });
+          searchResultCount.textContent = '';
+          return;
+        }
+
+        let matchCount = 0;
+        const matchedItems = new Set();
+        const itemsToShow = new Set();
+
+        // Find all matching items (search in title + body)
+        allTocItems.forEach(item => {
+          const searchText = item.dataset.searchText || '';
+          if (searchText.includes(term)) {
+            matchedItems.add(item);
+            matchCount++;
+          }
+        });
+
+        // For each matched item, show it and all its ancestors
+        matchedItems.forEach(item => {
+          itemsToShow.add(item);
+
+          // Show all parent items
+          let parent = item.parentElement;
+          while (parent && parent !== tocList) {
+            if (parent.classList.contains('toc-item')) {
+              itemsToShow.add(parent);
+            }
+            parent = parent.parentElement;
+          }
+
+          // Show all child items
+          const childItems = item.querySelectorAll('.toc-item');
+          childItems.forEach(child => itemsToShow.add(child));
+        });
+
+        // Hide/show items based on search
+        allTocItems.forEach(item => {
+          if (itemsToShow.has(item)) {
+            item.style.display = '';
+          } else {
+            item.style.display = 'none';
+          }
+        });
+
+        // Hide/show group boxes
+        document.querySelectorAll('.toc-group-box').forEach(box => {
+          const visibleChildren = Array.from(box.children).some(
+            child => child.style.display !== 'none'
+          );
+          box.style.display = visibleChildren ? '' : 'none';
+        });
+
+        // Update result count
+        if (matchCount === 0) {
+          searchResultCount.textContent = '검색 결과 없음';
+        } else if (matchCount === 1) {
+          searchResultCount.textContent = '1개 항목';
+        } else {
+          searchResultCount.textContent = matchCount + '개 항목';
+        }
+      }
+
+      // Event listeners
+      searchInput.addEventListener('input', (e) => {
+        filterTOC(e.target.value);
+      });
+
+      searchClear.addEventListener('click', () => {
+        searchInput.value = '';
+        filterTOC('');
+        searchInput.focus();
+      });
+
+      // Clear search on Escape key
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          filterTOC('');
+        }
+      });
+    })();
+  </script>
 
   <script>
     (function () {

@@ -488,8 +488,94 @@ export async function loadAnalystRating() {
 }
 
 /**
+ * Calculate statistics (mean, std, count) for an array of numbers, excluding null/undefined
+ * Includes confidence metrics: standard error (SE) and 95% confidence interval (CI)
+ *
+ * @param {number[]} values - Array of numeric values
+ * @returns {object} { mean, std, count, se, ci95Lower, ci95Upper, ci95Width }
+ */
+function calculateStats(values) {
+  const validValues = values.filter(v => v !== null && v !== undefined && !isNaN(v));
+  const count = validValues.length;
+
+  if (count === 0) {
+    return {
+      mean: null,
+      std: null,
+      count: 0,
+      se: null,
+      ci95Lower: null,
+      ci95Upper: null,
+      ci95Width: null
+    };
+  }
+
+  const mean = validValues.reduce((sum, v) => sum + v, 0) / count;
+
+  if (count === 1) {
+    return {
+      mean,
+      std: 0,
+      count,
+      se: null,  // Cannot calculate SE with only 1 sample
+      ci95Lower: null,
+      ci95Upper: null,
+      ci95Width: null
+    };
+  }
+
+  const variance = validValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / count;
+  const std = Math.sqrt(variance);
+
+  // Standard Error (SE) = σ / √n
+  const se = std / Math.sqrt(count);
+
+  // 95% Confidence Interval ≈ mean ± 1.96 × SE (≈ 2 × SE for simplicity)
+  // Using 1.96 for more accuracy (z-score for 95% CI)
+  const margin = 1.96 * se;
+  const ci95Lower = mean - margin;
+  const ci95Upper = mean + margin;
+  const ci95Width = 2 * margin;  // Total width of CI
+
+  return {
+    mean,
+    std,
+    count,
+    se,
+    ci95Lower,
+    ci95Upper,
+    ci95Width
+  };
+}
+
+/**
+ * Calculate quantiles from an array of numbers
+ * @param {number[]} sortedValues - Sorted array of numbers
+ * @param {number} q - Quantile (0-1)
+ * @returns {number|null} Quantile value
+ */
+function calculateQuantile(sortedValues, q) {
+  if (sortedValues.length === 0) return null;
+  const index = (sortedValues.length - 1) * q;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index % 1;
+
+  if (lower === upper) return sortedValues[lower];
+  return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+}
+
+/**
  * Generate analyst rating from analyst log
- * Calculates D+N gap rates for each unique analyst
+ * Calculates D+N gap rates for each unique analyst (analystName + analystCompany combination)
+ *
+ * Gap Rate Definition:
+ *   gapRate(D+N) = (D+N price / priceWhenPosted) - 1
+ *
+ * For each analyst:
+ *   - Collects all gapRate values for each D+N horizon across all their price targets
+ *   - Calculates mean, std, count for each horizon (excluding null values)
+ *   - Calculates timeToTarget statistics (days until price target is reached)
  *
  * @returns {Promise<object>} Result with success status
  */
@@ -507,7 +593,7 @@ export async function generateAnalystRating() {
     };
   }
 
-  // Extract unique analysts
+  // Extract unique analysts by analystName + analystCompany combination
   const uniqueAnalysts = {};
 
   for (const ticker in analystLog.analysts) {
@@ -515,38 +601,152 @@ export async function generateAnalystRating() {
 
     for (const record of records) {
       const analystName = record.analystName || 'Unknown';
+      const analystCompany = record.analystCompany || 'Unknown';
+      const analystKey = `${analystName}|${analystCompany}`;
 
-      if (!uniqueAnalysts[analystName]) {
-        uniqueAnalysts[analystName] = {
+      if (!uniqueAnalysts[analystKey]) {
+        uniqueAnalysts[analystKey] = {
           analystName,
-          analystCompany: record.analystCompany || null,
-          priceTargets: []
+          analystCompany,
+          records: []
         };
       }
 
-      uniqueAnalysts[analystName].priceTargets.push({
-        ticker: record.ticker || ticker,
-        publishedDate: record.publishedDate,
-        priceTarget: record.priceTarget,
-        adjPriceTarget: record.adjPriceTarget,
-        priceWhenPosted: record.priceWhenPosted
-      });
+      // Only include records with valid priceWhenPosted and priceTrend
+      if (record.priceWhenPosted && record.priceTrend) {
+        uniqueAnalysts[analystKey].records.push({
+          ticker: record.symbol || ticker,
+          publishedDate: record.publishedDate,
+          priceTarget: record.priceTarget,
+          adjPriceTarget: record.adjPriceTarget,
+          priceWhenPosted: record.priceWhenPosted,
+          priceTrend: record.priceTrend
+        });
+      }
     }
   }
 
-  // TODO: Implement ratingAnalyst logic (D+N gap calculation)
-  // For now, just count the number of price targets per analyst
+  // Calculate gap rates for each analyst
   const analystRatings = {};
 
-  for (const analystName in uniqueAnalysts) {
-    const analyst = uniqueAnalysts[analystName];
+  for (const analystKey in uniqueAnalysts) {
+    const analyst = uniqueAnalysts[analystKey];
+    const { analystName, analystCompany, records } = analyst;
 
-    analystRatings[analystName] = {
-      analystName: analyst.analystName,
-      analystCompany: analyst.analystCompany,
-      priceTargetCount: analyst.priceTargets.length,
-      // TODO: Add D+N gap calculations here
-      // gapRates: { ... }
+    // Collect gap rates for each D+N horizon
+    const gapRatesByHorizon = {};
+    PRICE_TREND_HORIZONS.forEach(h => {
+      gapRatesByHorizon[`D${h}`] = [];
+    });
+
+    // Collect timeToTarget data
+    const timeToTargetData = [];
+
+    for (const record of records) {
+      const { priceWhenPosted, priceTarget, priceTrend } = record;
+
+      // Calculate gap rates for each horizon
+      for (const horizon of PRICE_TREND_HORIZONS) {
+        const key = `D${horizon}`;
+        const priceAtHorizon = priceTrend[key];
+
+        if (priceAtHorizon !== null && priceAtHorizon !== undefined && priceWhenPosted > 0) {
+          const gapRate = (priceAtHorizon / priceWhenPosted) - 1;
+          gapRatesByHorizon[key].push(gapRate);
+        }
+      }
+
+      // Calculate timeToTarget (first time price reaches target)
+      if (priceTarget && priceWhenPosted > 0) {
+        let targetReached = false;
+        for (const horizon of PRICE_TREND_HORIZONS) {
+          const key = `D${horizon}`;
+          const priceAtHorizon = priceTrend[key];
+
+          if (priceAtHorizon !== null && priceAtHorizon !== undefined) {
+            // Check if target is reached (within 2% tolerance)
+            const targetRatio = priceAtHorizon / priceTarget;
+            if (targetRatio >= 0.98 && targetRatio <= 1.02) {
+              timeToTargetData.push({
+                daysToTarget: horizon,
+                targetPrice: priceTarget,
+                actualPrice: priceAtHorizon,
+                accuracy: targetRatio
+              });
+              targetReached = true;
+              break;
+            }
+          }
+        }
+
+        // If target not reached, record as null
+        if (!targetReached) {
+          timeToTargetData.push({
+            daysToTarget: null,
+            targetPrice: priceTarget,
+            actualPrice: null,
+            accuracy: null
+          });
+        }
+      }
+    }
+
+    // Calculate statistics for each horizon
+    const gapRates = {};
+    for (const horizon of PRICE_TREND_HORIZONS) {
+      const key = `D${horizon}`;
+      const values = gapRatesByHorizon[key];
+      const stats = calculateStats(values);
+
+      gapRates[key] = {
+        meanGapRate: stats.mean,
+        stdGapRate: stats.std,
+        count: stats.count,
+        // Statistical confidence metrics
+        standardError: stats.se,
+        ci95Lower: stats.ci95Lower,
+        ci95Upper: stats.ci95Upper,
+        ci95Width: stats.ci95Width
+      };
+    }
+
+    // Calculate timeToTarget statistics
+    const validTimeToTarget = timeToTargetData
+      .map(d => d.daysToTarget)
+      .filter(d => d !== null);
+
+    const sortedTTT = [...validTimeToTarget].sort((a, b) => a - b);
+    const timeToTargetStats = calculateStats(validTimeToTarget);
+
+    const timeToTarget = {
+      mean: timeToTargetStats.mean,
+      median: sortedTTT.length > 0 ? calculateQuantile(sortedTTT, 0.5) : null,
+      q25: sortedTTT.length > 0 ? calculateQuantile(sortedTTT, 0.25) : null,
+      q75: sortedTTT.length > 0 ? calculateQuantile(sortedTTT, 0.75) : null,
+      min: sortedTTT.length > 0 ? sortedTTT[0] : null,
+      max: sortedTTT.length > 0 ? sortedTTT[sortedTTT.length - 1] : null,
+      targetReachedCount: validTimeToTarget.length,
+      totalTargets: timeToTargetData.length,
+      reachedRatio: timeToTargetData.length > 0 ? validTimeToTarget.length / timeToTargetData.length : null
+    };
+
+    // Calculate overall accuracy metrics
+    const accuracyValues = timeToTargetData
+      .map(d => d.accuracy)
+      .filter(a => a !== null);
+    const accuracyStats = calculateStats(accuracyValues);
+
+    analystRatings[analystKey] = {
+      analystName,
+      analystCompany,
+      priceTargetCount: records.length,
+      gapRates,
+      timeToTarget,
+      accuracy: {
+        mean: accuracyStats.mean,
+        std: accuracyStats.std,
+        count: accuracyStats.count
+      }
     };
   }
 
@@ -555,6 +755,8 @@ export async function generateAnalystRating() {
       lastUpdated: getCurrentTimestampISO(),
       analystCount: Object.keys(analystRatings).length,
       sourceLogDate: analystLog.meta.lastUpdated,
+      horizons: PRICE_TREND_HORIZONS,
+      description: 'Gap rate = (D+N price / priceWhenPosted) - 1. Statistics exclude null values.',
       duration: `${Date.now() - startTime}ms`
     },
     analysts: analystRatings
@@ -564,6 +766,7 @@ export async function generateAnalystRating() {
 
   console.log(`Analyst rating generation completed in ${analystRating.meta.duration}`);
   console.log(`- Unique analysts: ${analystRating.meta.analystCount}`);
+  console.log(`- Price trend horizons: ${PRICE_TREND_HORIZONS.join(', ')}`);
 
   return {
     success: true,

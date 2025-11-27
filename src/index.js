@@ -5,6 +5,7 @@ import getEventLatest from './api/endpoints/getEventLatest.js';
 import getValuation from './api/endpoints/getValuation.js';
 import refreshAnalystLog from './api/endpoints/refreshAnalystLog.js';
 import generateRating from './api/endpoints/generateRating.js';
+import apiGuide from './api/endpoints/apiGuide.js';
 import logger from './api/middleware/logger.js';
 import errorHandler from './api/middleware/errorHandler.js';
 import { initScheduler } from './services/scheduler.js';
@@ -14,6 +15,9 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(logger);
+
+// Root endpoint - API Guide
+app.get('/', apiGuide);
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {

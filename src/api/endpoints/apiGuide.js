@@ -2338,6 +2338,8 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       // Highlight active section on scroll
       function updateActiveTOC() {
         const scrollPosition = window.scrollY + 100; // Offset for better UX
+        const tocSidebar = document.querySelector('.toc-sidebar');
+        let activeLink = null;
 
         headings.forEach((heading) => {
           const section = heading;
@@ -2351,8 +2353,36 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
             document.querySelectorAll('.toc-link').forEach(l => l.classList.remove('active'));
             // Add active to current
             link.classList.add('active');
+            activeLink = link;
           }
         });
+
+        // 활성화된 링크가 보이도록 목차 스크롤 조정
+        if (activeLink && tocSidebar) {
+          const linkRect = activeLink.getBoundingClientRect();
+          const sidebarRect = tocSidebar.getBoundingClientRect();
+          
+          // 링크가 사이드바 뷰포트 밖에 있는지 확인
+          const isAboveViewport = linkRect.top < sidebarRect.top;
+          const isBelowViewport = linkRect.bottom > sidebarRect.bottom;
+          
+          if (isAboveViewport || isBelowViewport) {
+            // 링크를 사이드바 중앙 근처에 위치시키기
+            const linkTop = activeLink.offsetTop;
+            const sidebarScrollTop = tocSidebar.scrollTop;
+            const sidebarHeight = tocSidebar.clientHeight;
+            const linkHeight = activeLink.offsetHeight;
+            
+            // 링크를 사이드바 중앙에 맞추기 위한 스크롤 위치 계산
+            const targetScrollTop = linkTop - (sidebarHeight / 2) + (linkHeight / 2);
+            
+            // 부드러운 스크롤
+            tocSidebar.scrollTo({
+              top: Math.max(0, targetScrollTop),
+              behavior: 'smooth'
+            });
+          }
+        }
       }
 
       // Update on scroll

@@ -1341,6 +1341,444 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
       </div>
     </section>
 
+
+    <!-- Price Tracker API Documentation (Feature 002) -->
+    <section class="section-block">
+      <h2 id="price-tracker-api">Price Tracker API - 거래 추적 및 모델 성과 분석</h2>
+
+      <p class="section-intro">
+        개별 거래의 D+1~D+14 가격 변동을 추적하고, Cap-Aware 수익률 계산을 통해 트레이딩 모델의 성과를 분석하는 API입니다.
+        Long/Short 포지션별로 일중 고가/저가를 고려한 현실적인 수익률 계산을 제공하며, 모델별 최적 보유일수 및 추천 Cap 임계값을 자동 산출합니다.
+      </p>
+
+      <div class="endpoint">
+        <h3 class="endpoint-title">6. POST /priceTracker - 거래 추적 등록</h3>
+        <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/priceTracker</code>
+
+        <h4>기능 설명</h4>
+        <p>개별 거래를 등록하고 D+1~D+14 일별 가격 데이터를 수집하여 Cap-Aware 수익률을 계산합니다.
+        배치 처리 방식으로 여러 거래를 한 번에 등록할 수 있으며, HTTP 207 Multi-Status 응답으로 각 거래의 성공/실패 상태를 개별 반환합니다.</p>
+
+        <h4>데이터 수집 및 계산 프로세스</h4>
+        <ul>
+          <li><strong>입력 검증:</strong> position(long/short), modelName(MODEL-{숫자}), ticker(심볼캐시 존재 확인), purchaseDate(과거 날짜 검증)</li>
+          <li><strong>현재가 조회:</strong> 구매일 기준 종가(currentPrice) 조회</li>
+          <li><strong>D+N 가격 이력 수집:</strong> D+1부터 D+14까지 각 거래일의 OHLC(시가/고가/저가/종가) 데이터 조회</li>
+          <li><strong>Cap-Aware 수익률 계산:</strong> 포지션별로 일중 고가/저가가 임계값 도달 시 시가 기준 수익률 적용</li>
+          <li><strong>캐시 병합:</strong> 기존 거래 데이터와 병합하여 docs/trackedPriceCache.json에 저장</li>
+          <li><strong>모델 성과 재계산:</strong> 해당 모델의 전체 거래 기반으로 최적 보유일수/추천 Cap/평균 수익률 갱신</li>
+        </ul>
+
+        <h4>요청 형식 (text/plain, 탭 구분)</h4>
+        <pre><code>position	modelName	ticker	purchaseDate
+long	MODEL-1	AAPL	2025-11-20
+short	MODEL-2	MSFT	2025-11-21
+long	MODEL-1	GOOGL	2025-11-22</code></pre>
+
+        <h4>입력 필드 검증 규칙</h4>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>필드</th>
+              <th>유효성 규칙</th>
+              <th>에러 코드</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>position</code></td>
+              <td>"long" 또는 "short"만 허용</td>
+              <td>INVALID_POSITION</td>
+            </tr>
+            <tr>
+              <td><code>modelName</code></td>
+              <td>정규식: <code>^MODEL-\\d+$</code> (예: MODEL-1, MODEL-123)</td>
+              <td>INVALID_MODEL_NAME</td>
+            </tr>
+            <tr>
+              <td><code>ticker</code></td>
+              <td>대문자 영문만 허용 + symbolCache.json에 존재해야 함</td>
+              <td>INVALID_TICKER / TICKER_NOT_FOUND</td>
+            </tr>
+            <tr>
+              <td><code>purchaseDate</code></td>
+              <td>YYYY-MM-DD 형식 + 과거 또는 오늘 날짜</td>
+              <td>INVALID_DATE_FORMAT / FUTURE_DATE</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Cap-Aware 수익률 계산 로직</h4>
+        <p>일중 가격 변동이 임계값(maxCap/lowCap)을 초과할 때 시가 기준 수익률을 적용하여 현실적인 매매 시나리오를 반영합니다.</p>
+
+        <h5>Long 포지션 (매수 전략)</h5>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>조건</th>
+              <th>수익률 계산식</th>
+              <th>returnSource</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>고가(high) ≥ currentPrice × (1 + maxCap)</td>
+              <td><code>(시가 - currentPrice) / currentPrice</code></td>
+              <td>open_maxCap</td>
+            </tr>
+            <tr>
+              <td>저가(low) ≤ currentPrice × (1 - lowCap)</td>
+              <td><code>(시가 - currentPrice) / currentPrice</code></td>
+              <td>open_lowCap</td>
+            </tr>
+            <tr>
+              <td>상기 조건 모두 미충족</td>
+              <td><code>(종가 - currentPrice) / currentPrice</code></td>
+              <td>close_normal</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h5>Short 포지션 (공매도 전략)</h5>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>조건</th>
+              <th>수익률 계산식</th>
+              <th>returnSource</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>저가(low) ≤ currentPrice × (1 - lowCap)</td>
+              <td><code>(currentPrice - 시가) / currentPrice</code></td>
+              <td>open_lowCap</td>
+            </tr>
+            <tr>
+              <td>고가(high) ≥ currentPrice × (1 + maxCap)</td>
+              <td><code>(currentPrice - 시가) / currentPrice</code></td>
+              <td>open_maxCap</td>
+            </tr>
+            <tr>
+              <td>상기 조건 모두 미충족</td>
+              <td><code>(currentPrice - 종가) / currentPrice</code></td>
+              <td>close_normal</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>Progressive Null-Filling:</strong> 미래 D+N 날짜의 수익률은 null로 저장되며, 시간이 경과하면 자동으로 실제 수익률로 업데이트됩니다.
+          예: 오늘이 구매일+3일이면 D+1~D+3은 실제값, D+4~D+14는 null입니다.
+        </div>
+
+        <h4>응답 구조 (HTTP 207 Multi-Status)</h4>
+        <pre><code>{
+  "results": [
+    {
+      "index": 0,
+      "status": 200,
+      "trade": {
+        "position": "long",
+        "modelName": "MODEL-1",
+        "ticker": "AAPL",
+        "purchaseDate": "2025-11-20"
+      },
+      "data": {
+        "currentPrice": 185.32,
+        "priceHistory": {
+          "D+1": { "date": "2025-11-21", "open": 186.00, "high": 188.50, "low": 185.00, "close": 187.20 },
+          "D+2": { "date": "2025-11-22", "open": 187.50, ... }
+        },
+        "returns": {
+          "D+1": { "returnRate": 0.0101, "returnSource": "close_normal" },
+          "D+2": { "returnRate": 0.0230, "returnSource": "open_maxCap" },
+          "D+14": null
+        }
+      }
+    },
+    {
+      "index": 1,
+      "status": 404,
+      "trade": { ... },
+      "error": {
+        "code": "TICKER_NOT_FOUND",
+        "message": "Ticker XYZ not found in symbolCache"
+      }
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "succeeded": 1,
+    "failed": 1
+  }
+}</code></pre>
+
+        <h4>에러 코드</h4>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>코드</th>
+              <th>HTTP 상태</th>
+              <th>설명</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>INVALID_FORMAT</td>
+              <td>400</td>
+              <td>요청 본문이 탭 구분 형식이 아니거나 필드 개수 불일치</td>
+            </tr>
+            <tr>
+              <td>INVALID_POSITION</td>
+              <td>400</td>
+              <td>position이 "long" 또는 "short"가 아님</td>
+            </tr>
+            <tr>
+              <td>INVALID_MODEL_NAME</td>
+              <td>400</td>
+              <td>modelName이 MODEL-{숫자} 패턴이 아님</td>
+            </tr>
+            <tr>
+              <td>INVALID_TICKER</td>
+              <td>400</td>
+              <td>ticker가 대문자 영문이 아님</td>
+            </tr>
+            <tr>
+              <td>TICKER_NOT_FOUND</td>
+              <td>404</td>
+              <td>ticker가 symbolCache.json에 없음</td>
+            </tr>
+            <tr>
+              <td>INVALID_DATE_FORMAT</td>
+              <td>400</td>
+              <td>purchaseDate가 YYYY-MM-DD 형식이 아님</td>
+            </tr>
+            <tr>
+              <td>FUTURE_DATE</td>
+              <td>400</td>
+              <td>purchaseDate가 미래 날짜</td>
+            </tr>
+            <tr>
+              <td>INTERNAL_ERROR</td>
+              <td>500</td>
+              <td>API 호출 실패 또는 내부 오류</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>curl 사용 예시</h4>
+        <pre><code>curl -X POST https://getevents.onrender.com/priceTracker \\
+  -H "Content-Type: text/plain" \\
+  -d "long	MODEL-1	AAPL	2025-11-20"</code></pre>
+      </div>
+
+      <div class="endpoint">
+        <h3 class="endpoint-title">7. GET /trackedPrice - 거래 조회 및 모델 성과 요약</h3>
+        <code class="endpoint-url" onclick="window.open(this.textContent, '_blank')">https://getevents.onrender.com/trackedPrice</code>
+
+        <h4>기능 설명</h4>
+        <p>등록된 모든 거래 기록과 모델별 성과 요약 통계를 조회합니다.
+        최적 보유일수, 추천 maxCap/lowCap, 평균 수익률, 승률 등 포괄적인 백테스팅 결과를 제공합니다.</p>
+
+        <h4>데이터 처리 프로세스</h4>
+        <ul>
+          <li><code>docs/trackedPriceCache.json</code> 파일 읽기</li>
+          <li>캐시 데이터 JSON 파싱 및 유효성 검증</li>
+          <li>meta, trades, modelSummaries 반환</li>
+        </ul>
+
+        <h4>응답 구조</h4>
+        <pre><code>{
+  "meta": {
+    "lastUpdated": "2025-11-25T10:30:00.000Z",
+    "totalTrades": 150,
+    "uniqueModels": 5
+  },
+  "trades": [
+    {
+      "position": "long",
+      "modelName": "MODEL-1",
+      "ticker": "AAPL",
+      "purchaseDate": "2025-11-20",
+      "currentPrice": 185.32,
+      "priceHistory": { "D+1": {...}, "D+2": {...}, ... },
+      "returns": { "D+1": {...}, "D+2": {...}, ... },
+      "meta": {
+        "lastUpdated": "2025-11-25T10:30:00.000Z",
+        "dataSource": "fmp_historical_ohlc"
+      }
+    }
+  ],
+  "modelSummaries": [
+    {
+      "modelName": "MODEL-1",
+      "totalTrades": 45,
+      "optimalHoldingDays": [3, 5, 7],
+      "suggestedMaxCap": 0.078,
+      "suggestedLowCap": 0.032,
+      "avgReturnByDay": {
+        "D+1": 0.0032,
+        "D+3": 0.0089,
+        "D+7": 0.0145,
+        "D+14": 0.0201
+      },
+      "winRateByDay": {
+        "D+1": 0.52,
+        "D+3": 0.58,
+        "D+7": 0.61,
+        "D+14": 0.55
+      },
+      "meta": {
+        "lastUpdated": "2025-11-25T10:30:00.000Z"
+      }
+    }
+  ]
+}</code></pre>
+
+        <h4>모델 성과 지표 계산 로직</h4>
+
+        <h5>최적 보유일수 (optimalHoldingDays)</h5>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>지표</th>
+              <th>계산 방법</th>
+              <th>의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>optimalHoldingDays</strong></td>
+              <td>각 D+N의 평균 수익률을 계산 → 상위 3개 D+N 선택 (내림차순 정렬)</td>
+              <td>해당 모델에서 가장 수익률이 높은 보유 기간 (예: [3, 5, 7])</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h5>추천 Cap 임계값</h5>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>지표</th>
+              <th>계산 방법</th>
+              <th>의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>suggestedMaxCap</strong></td>
+              <td>전체 거래의 모든 D+N 수익률 수집 → 20th percentile 계산</td>
+              <td>Long 포지션의 이익실현 임계값 (상위 80% 수익률 지점)</td>
+            </tr>
+            <tr>
+              <td><strong>suggestedLowCap</strong></td>
+              <td>전체 거래의 모든 D+N 수익률 수집 → 5th percentile 계산 (절댓값)</td>
+              <td>손절 임계값 (하위 5% 손실률 지점)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>Percentile 계산 방식:</strong> 선형 보간법(Linear Interpolation) 사용.
+          거래 건수가 3건 미만이면 suggestedMaxCap 및 suggestedLowCap은 null 반환됩니다.
+        </div>
+
+        <h5>평균 수익률 및 승률</h5>
+        <table class="metric-table">
+          <thead>
+            <tr>
+              <th>지표</th>
+              <th>계산 방법</th>
+              <th>의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>avgReturnByDay[D+N]</strong></td>
+              <td>D+N의 모든 유효 수익률(null 제외) 평균</td>
+              <td>D+N 시점의 평균 수익률 (소수점 표시, 예: 0.0032 = 0.32%)</td>
+            </tr>
+            <tr>
+              <td><strong>winRateByDay[D+N]</strong></td>
+              <td>(수익률 > 0인 거래 수) / (유효 거래 총 수)</td>
+              <td>D+N 시점의 승률 (0~1 범위, 예: 0.58 = 58%)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>주의사항</h4>
+        <div class="note">
+          <ul>
+            <li>캐시 파일이 없으면 404 에러 반환 → 먼저 <code>/priceTracker</code>로 거래 등록 필요</li>
+            <li>Progressive Null-Filling으로 인해 최근 거래는 일부 D+N 수익률이 null일 수 있음</li>
+            <li>모델 성과 지표는 POST /priceTracker 호출 시마다 자동 재계산됨</li>
+          </ul>
+        </div>
+
+        <h4>curl 사용 예시</h4>
+        <pre><code>curl https://getevents.onrender.com/trackedPrice</code></pre>
+      </div>
+
+      <h3>트레이딩 캘린더 및 D+N 날짜 계산</h3>
+      <p>D+N 날짜는 NYSE 거래일 기준으로 계산됩니다. 주말 및 다음 공휴일은 자동으로 건너뜁니다:</p>
+
+      <h4>2025년 NYSE 공휴일</h4>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>날짜</th>
+            <th>공휴일</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>2025-01-01</td><td>New Year's Day</td></tr>
+          <tr><td>2025-01-20</td><td>Martin Luther King Jr. Day</td></tr>
+          <tr><td>2025-02-17</td><td>Presidents' Day</td></tr>
+          <tr><td>2025-04-18</td><td>Good Friday</td></tr>
+          <tr><td>2025-05-26</td><td>Memorial Day</td></tr>
+          <tr><td>2025-07-04</td><td>Independence Day</td></tr>
+          <tr><td>2025-09-01</td><td>Labor Day</td></tr>
+          <tr><td>2025-11-27</td><td>Thanksgiving Day</td></tr>
+          <tr><td>2025-12-25</td><td>Christmas Day</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Fallback 메커니즘:</strong> 거래일 조회 시 7일 연속 비거래일이면 null 반환.
+        공휴일 데이터는 매년 수동으로 <code>src/lib/tradingCalendar.js</code>에서 업데이트 필요합니다.
+      </div>
+
+      <h3>활용 시나리오</h3>
+
+      <h4>시나리오 1: 신규 트레이딩 모델 백테스팅</h4>
+      <ol>
+        <li>과거 거래 신호 목록을 탭 구분 텍스트 파일로 준비</li>
+        <li>POST /priceTracker로 배치 등록 (최대 100건/요청 권장)</li>
+        <li>GET /trackedPrice로 모델 성과 확인:
+          <ul>
+            <li>optimalHoldingDays로 최적 청산 타이밍 파악</li>
+            <li>suggestedMaxCap/lowCap으로 손익 임계값 설정</li>
+            <li>avgReturnByDay/winRateByDay로 일별 성과 추이 분석</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h4>시나리오 2: 실시간 트레이딩 모니터링</h4>
+      <ol>
+        <li>매일 장 마감 후 당일 신규 거래를 POST /priceTracker로 등록</li>
+        <li>주기적으로 GET /trackedPrice 호출하여 기존 거래의 D+N 수익률 업데이트 확인</li>
+        <li>모델별 성과가 기준치 이하로 떨어지면 알림 (외부 모니터링 시스템 연동)</li>
+      </ol>
+
+      <h4>시나리오 3: 다중 모델 비교 분석</h4>
+      <ol>
+        <li>동일한 종목/기간에 대해 서로 다른 modelName으로 거래 등록 (예: MODEL-1 = MA 전략, MODEL-2 = RSI 전략)</li>
+        <li>GET /trackedPrice의 modelSummaries 배열에서 각 모델의 성과 지표 비교</li>
+        <li>optimalHoldingDays, avgReturn, winRate를 기준으로 우수 모델 선별</li>
+      </ol>
+    </section>
+
     <section class="section-block">
       <h2 id="project-structure">프로젝트 구조 및 설정 파일</h2>
 

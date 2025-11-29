@@ -1,0 +1,363 @@
+openapi: 3.0.3
+info:
+  title: Price Tracker API
+  description: |
+    Track individual trades with position-specific return calculations across D+1 to D+14 horizons.
+    Supports bulk input via tab-delimited format and progressive D+N data filling.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /priceTracker:
+    post:
+      summary: Track new trades or update existing trades
+      description: |
+        Accepts single or multiple trades in tab-delimited format. For duplicate trades
+        (matching position, modelName, ticker, purchaseDate), existing complete records
+        are preserved, and null values are filled progressively.
+      operationId: trackPrices
+      tags:
+        - Price Tracking
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              description: |
+                Tab-delimited format: position\tmodelName\tticker\tpurchaseDate
+                Each line represents one trade. Example:
+                long\tMODEL-0\tAAPL\t2025-11-01
+                short\tMODEL-0\tTSLA\t2025-11-15
+              example: |
+                long\tMODEL-0\tAAPL\t2025-11-01
+                short\tMODEL-0\tTSLA\t2025-11-15
+                long\tMODEL-1\tMSFT\t2025-11-20
+      responses:
+        '207':
+          description: Multi-Status - Per-trade results with individual success/failure status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultiStatusResponse'
+              examples:
+                mixedResults:
+                  summary: Mixed success and failure
+                  value:
+                    results:
+                      - index: 0
+                        status: 200
+                        trade:
+                          position: long
+                          modelName: MODEL-0
+                          ticker: AAPL
+                          purchaseDate: '2025-11-01'
+                        data:
+                          currentPrice: 150.25
+                          priceHistory:
+                            - targetDate: '2025-11-04'
+                              actualDate: '2025-11-04'
+                              open: 151.00
+                              high: 153.50
+                              low: 150.75
+                              close: 152.25
+                            - targetDate: '2025-11-05'
+                              actualDate: null
+                              open: null
+                              high: null
+                              low: null
+                              close: null
+                          returns:
+                            - date: '2025-11-04'
+                              returnRate: 0.0133
+                              returnSource: close
+                              cumulativeReturn: 0.0133
+                            - date: '2025-11-05'
+                              returnRate: null
+                              returnSource: null
+                              cumulativeReturn: null
+                      - index: 1
+                        status: 404
+                        trade:
+                          position: short
+                          modelName: MODEL-0
+                          ticker: INVALID
+                          purchaseDate: '2025-11-15'
+                        error:
+                          message: Ticker not found in symbolCache
+                          code: TICKER_NOT_FOUND
+                    summary:
+                      total: 2
+                      succeeded: 1
+                      failed: 1
+        '400':
+          description: Bad Request - Invalid input format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emptyInput:
+                  summary: Empty request body
+                  value:
+                    error:
+                      message: Request body cannot be empty
+                      code: EMPTY_REQUEST
+                malformedInput:
+                  summary: Invalid tab-delimited format
+                  value:
+                    error:
+                      message: Invalid format - expected 4 tab-delimited fields per line
+                      code: INVALID_FORMAT
+        '401':
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingApiKey:
+                  summary: Missing X-API-Key header
+                  value:
+                    error:
+                      message: API key required
+                      code: MISSING_API_KEY
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (currently uses same value as FMP API key)
+
+  schemas:
+    MultiStatusResponse:
+      type: object
+      required:
+        - results
+        - summary
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeResult'
+        summary:
+          $ref: '#/components/schemas/BatchSummary'
+
+    TradeResult:
+      type: object
+      required:
+        - index
+        - status
+        - trade
+      properties:
+        index:
+          type: integer
+          description: Zero-based index of trade in request
+          minimum: 0
+        status:
+          type: integer
+          description: HTTP status code for this specific trade
+          enum: [200, 400, 404, 500]
+        trade:
+          $ref: '#/components/schemas/TradeInput'
+        data:
+          $ref: '#/components/schemas/TradeData'
+          description: Present only if status is 200
+        error:
+          $ref: '#/components/schemas/TradeError'
+          description: Present only if status is not 200
+
+    TradeInput:
+      type: object
+      required:
+        - position
+        - modelName
+        - ticker
+        - purchaseDate
+      properties:
+        position:
+          type: string
+          enum: [long, short]
+          description: Trading direction
+        modelName:
+          type: string
+          pattern: '^MODEL-\d+$'
+          example: MODEL-0
+          description: Model identifier
+        ticker:
+          type: string
+          pattern: '^[A-Z]+$'
+          example: AAPL
+          description: Stock symbol (uppercase)
+        purchaseDate:
+          type: string
+          format: date
+          example: '2025-11-01'
+          description: Trade entry date (YYYY-MM-DD, UTC)
+
+    TradeData:
+      type: object
+      required:
+        - currentPrice
+        - priceHistory
+        - returns
+      properties:
+        currentPrice:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          example: 150.25
+          description: Purchase date open price (up to 4 decimal places)
+        priceHistory:
+          type: array
+          minItems: 14
+          maxItems: 14
+          items:
+            $ref: '#/components/schemas/PriceHistory'
+          description: OHLC data for D+1 to D+14 (nulls for future dates)
+        returns:
+          type: array
+          minItems: 14
+          maxItems: 14
+          items:
+            $ref: '#/components/schemas/ReturnRecord'
+          description: Position-specific returns for D+1 to D+14 (nulls for future dates)
+
+    PriceHistory:
+      type: object
+      required:
+        - targetDate
+      properties:
+        targetDate:
+          type: string
+          format: date
+          description: Intended D+N date (YYYY-MM-DD)
+        actualDate:
+          type: string
+          format: date
+          nullable: true
+          description: Actual trading day used (null if future date)
+        open:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Opening price (null if future date)
+        high:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Intraday high (null if future date)
+        low:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Intraday low (null if future date)
+        close:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Closing price (null if future date)
+
+    ReturnRecord:
+      type: object
+      required:
+        - date
+      properties:
+        date:
+          type: string
+          format: date
+          description: Return calculation date (matches PriceHistory.actualDate)
+        returnRate:
+          type: number
+          format: double
+          nullable: true
+          description: Daily return rate (null if future date)
+          example: 0.0133
+        returnSource:
+          type: string
+          enum: [close, open_maxCap, open_lowCap]
+          nullable: true
+          description: Price type used for calculation (null if future date)
+        cumulativeReturn:
+          type: number
+          format: double
+          nullable: true
+          description: Cumulative return from purchase date (null if future date)
+          example: 0.0201
+
+    TradeError:
+      type: object
+      required:
+        - message
+        - code
+      properties:
+        message:
+          type: string
+          description: Human-readable error description
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - TICKER_NOT_FOUND
+            - INVALID_DATE
+            - API_ERROR
+            - MISSING_FIELD
+
+    BatchSummary:
+      type: object
+      required:
+        - total
+        - succeeded
+        - failed
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of trades in request
+        succeeded:
+          type: integer
+          minimum: 0
+          description: Number of successfully processed trades
+        failed:
+          type: integer
+          minimum: 0
+          description: Number of failed trades
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - code
+          properties:
+            message:
+              type: string
+              description: Human-readable error description
+            code:
+              type: string
+              description: Machine-readable error code

@@ -90,3 +90,34 @@ export function addDaysToDate(dateStr, daysToAdd) {
   const newDate = addDays(date, daysToAdd);
   return formatISO(newDate, { representation: 'date' });
 }
+
+/**
+ * Calculate D+N target date from purchase date
+ * Used for price tracker to calculate D+1 through D+14 horizons
+ *
+ * @param {string} purchaseDate - Purchase date in YYYY-MM-DD format
+ * @param {number} n - Number of days after purchase (1-14)
+ * @returns {string} Target date in YYYY-MM-DD format
+ *
+ * @example
+ * calculateDPlusN('2025-11-01', 1) // Returns '2025-11-02' (D+1)
+ * calculateDPlusN('2025-11-01', 14) // Returns '2025-11-15' (D+14)
+ */
+export function calculateDPlusN(purchaseDate, n) {
+  if (!purchaseDate || typeof purchaseDate !== 'string') {
+    throw new Error('purchaseDate must be a non-empty string');
+  }
+
+  if (!Number.isInteger(n) || n < 1 || n > 14) {
+    throw new Error('n must be an integer between 1 and 14');
+  }
+
+  const date = parseISO(purchaseDate);
+
+  if (isNaN(date.getTime())) {
+    throw new Error('Invalid purchaseDate format. Expected YYYY-MM-DD');
+  }
+
+  const targetDate = addDays(date, n);
+  return formatISO(targetDate, { representation: 'date' });
+}

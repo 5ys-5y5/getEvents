@@ -20,7 +20,13 @@
       "Bash(python -m json.tool:*)",
       "Bash(node test-market-status.js:*)",
       "Bash(node:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "SlashCommand(/speckit.specify)",
+      "Bash(git fetch:*)",
+      "Bash(pwsh:*)",
+      "Bash(.specify/scripts/bash/create-new-feature.sh:*)",
+      "Bash(python:*)",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []

@@ -168,3 +168,109 @@ export default {
   fetchApi,
   fetchMultiple
 };
+
+/**
+ * Get historical OHLC data for a specific date
+ * Per data-model.md: Fetch daily open, high, low, close prices
+ *
+ * @param {string} ticker - Stock symbol (uppercase)
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @returns {Promise<{success: boolean, data?: {open: number, high: number, low: number, close: number, date: string}, error?: Object}>}
+ *
+ * @example
+ * const result = await getHistoricalOHLC('AAPL', '2025-11-01');
+ * if (result.success) {
+ *   console.log(result.data); // { open: 150.25, high: 152.50, low: 149.75, close: 151.00, date: '2025-11-01' }
+ * }
+ */
+export async function getHistoricalOHLC(ticker, date) {
+  if (!ticker || typeof ticker !== 'string') {
+    return {
+      success: false,
+      error: {
+        serviceId: 'fmp_historical_ohlc',
+        statusCode: 400,
+        errorMessage: 'ticker must be a non-empty string',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return {
+      success: false,
+      error: {
+        serviceId: 'fmp_historical_ohlc',
+        statusCode: 400,
+        errorMessage: 'date must be in YYYY-MM-DD format',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) {
+    return {
+      success: false,
+      error: {
+        serviceId: 'fmp_historical_ohlc',
+        statusCode: 500,
+        errorMessage: 'FMP_API_KEY environment variable not set',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  // FMP historical price endpoint: https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?from={date}&to={date}
+  const url = `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?from=${date}&to=${date}&apikey=${apiKey}`;
+
+  const result = await fetchApi(url, 'fmp_historical_ohlc');
+
+  if (!result.success) {
+    return result;
+  }
+
+  // FMP returns: { symbol: "AAPL", historical: [{ date, open, high, low, close, ... }] }
+  const historical = result.data?.historical;
+
+  if (!historical || !Array.isArray(historical) || historical.length === 0) {
+    return {
+      success: false,
+      error: {
+        serviceId: 'fmp_historical_ohlc',
+        statusCode: 404,
+        errorMessage: `No historical data found for ${ticker} on ${date}`,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  const dayData = historical[0];
+
+  // Validate required fields
+  if (typeof dayData.open !== 'number' ||
+      typeof dayData.high !== 'number' ||
+      typeof dayData.low !== 'number' ||
+      typeof dayData.close !== 'number') {
+    return {
+      success: false,
+      error: {
+        serviceId: 'fmp_historical_ohlc',
+        statusCode: 500,
+        errorMessage: 'Invalid OHLC data format from FMP API',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  return {
+    success: true,
+    data: {
+      open: dayData.open,
+      high: dayData.high,
+      low: dayData.low,
+      close: dayData.close,
+      date: dayData.date
+    }
+  };
+}

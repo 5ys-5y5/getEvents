@@ -618,6 +618,177 @@ cp .env.example .env  # FMP_API_KEY 추가</code></pre>
     </section>
 
     <section class="section-block">
+      <h2 id="cache-files">캐시 있는 주요한 문서 목록</h2>
+
+      <p class="section-intro">
+        이 API는 파일 기반 캐시 시스템을 사용하여 데이터를 저장하고 관리합니다.
+        모든 캐시 파일은 <code>docs/</code> 디렉토리에 JSON 형식으로 저장됩니다.
+      </p>
+
+      <h3>캐시 파일 목록</h3>
+
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>파일명</th>
+            <th>설명</th>
+            <th>갱신 주기</th>
+            <th>용도</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>symbolCache.json</code></td>
+            <td>거래 가능한 주식 심볼 목록 (약 30,000개 종목)</td>
+            <td>수동 갱신</td>
+            <td>티커 유효성 검증, 동종업계(Peer) 조회</td>
+          </tr>
+          <tr>
+            <td><code>getEventCache.json</code></td>
+            <td>최근 <code>/getEvent</code> 호출 결과 (재무 이벤트 데이터)</td>
+            <td>GET /getEvent 호출 시 자동 갱신</td>
+            <td><code>/getEventLatest</code>에서 즉시 반환, <code>/getValuation</code>의 cache=true 모드에서 티커 목록 추출</td>
+          </tr>
+          <tr>
+            <td><code>trackedPriceCache.json</code></td>
+            <td>등록된 거래 추적 데이터 (trades + modelSummaries)</td>
+            <td>POST /priceTracker 호출 시 자동 갱신</td>
+            <td>거래별 D+1~D+14 가격 이력 및 수익률, 모델별 성과 요약 통계</td>
+          </tr>
+          <tr>
+            <td><code>analystLog.json</code></td>
+            <td>애널리스트 목표가 및 가격 추이 데이터</td>
+            <td>매일 자동 갱신 (자정 ET) 또는 수동 호출 (/refreshAnalystLog)</td>
+            <td><code>/generateRating</code>에서 D+N 갭률 계산 및 등급 생성</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>캐시 파일 구조</h3>
+
+      <h4>symbolCache.json</h4>
+      <pre><code>{
+  "meta": {
+    "lastUpdated": "2025-11-25T10:00:00.000Z",
+    "totalSymbols": 30245
+  },
+  "symbols": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "type": "stock",
+      "exchangeShortName": "NASDAQ",
+      "sector": "Technology",
+      "industry": "Consumer Electronics"
+    }
+  ]
+}</code></pre>
+
+      <h4>getEventCache.json</h4>
+      <pre><code>{
+  "meta": {
+    "type": "meta",
+    "request": { "startDate": 3, "endDate": 7, ... },
+    "response": { "eventCount": 145, "duration": "2341ms", ... }
+  },
+  "events": [
+    {
+      "ticker": "AAPL",
+      "date": "2025-12-01",
+      "event": "Earnings Release",
+      "serviceId": "service-FMP-earnings-calendar"
+    }
+  ]
+}</code></pre>
+
+      <h4>trackedPriceCache.json</h4>
+      <pre><code>{
+  "meta": {
+    "lastUpdated": "2025-11-25T10:30:00.000Z",
+    "totalTrades": 150,
+    "uniqueModels": 5
+  },
+  "trades": [
+    {
+      "position": "long",
+      "modelName": "MODEL-1",
+      "ticker": "AAPL",
+      "purchaseDate": "2025-11-20",
+      "currentPrice": 185.32,
+      "priceHistory": { "D+1": {...}, ... },
+      "returns": { "D+1": {...}, ... }
+    }
+  ],
+  "modelSummaries": [
+    {
+      "modelName": "MODEL-1",
+      "optimalHoldingDays": [3, 5, 7],
+      "suggestedMaxCap": 0.078,
+      "suggestedLowCap": 0.032,
+      ...
+    }
+  ]
+}</code></pre>
+
+      <h4>analystLog.json</h4>
+      <pre><code>{
+  "meta": {
+    "lastUpdated": "2025-11-25T00:00:00.000Z",
+    "totalTickers": 4850
+  },
+  "data": [
+    {
+      "ticker": "AAPL",
+      "targetPrice": 195.50,
+      "numberOfAnalysts": 45,
+      "priceTrend": {
+        "D+0": 185.32,
+        "D+1": 186.75,
+        ...
+        "D+365": 202.15
+      }
+    }
+  ]
+}</code></pre>
+
+      <div class="note">
+        <strong>파일 잠금 (File Locking):</strong>
+        <code>trackedPriceCache.json</code>은 동시성 제어를 위해 proper-lockfile 라이브러리를 사용합니다.
+        여러 요청이 동시에 캐시를 수정하려 할 때 자동으로 대기 후 순차 처리됩니다 (재시도 3회, 100-500ms 타임아웃).
+      </div>
+
+      <div class="note">
+        <strong>백업 메커니즘:</strong>
+        <code>trackedPriceCache.json</code> 갱신 전 자동으로 <code>trackedPriceCache.json.backup</code>에 백업됩니다.
+        데이터 손실 시 백업 파일에서 복구 가능합니다.
+      </div>
+
+      <h3>캐시 관리 명령어</h3>
+
+      <h4>수동 캐시 갱신</h4>
+      <ul>
+        <li><strong>symbolCache 갱신:</strong> <code>npm run refresh:symbol-cache</code> (또는 FMP API에서 수동 다운로드)</li>
+        <li><strong>analystLog 갱신:</strong> <code>GET /refreshAnalystLog</code> 엔드포인트 호출</li>
+        <li><strong>eventCache 갱신:</strong> <code>GET /getEvent?startDate=N&endDate=M</code> 엔드포인트 호출</li>
+        <li><strong>trackedPrice 갱신:</strong> <code>POST /priceTracker</code> 엔드포인트로 거래 등록 시 자동 갱신</li>
+      </ul>
+
+      <h4>캐시 초기화</h4>
+      <pre><code># 개별 캐시 삭제
+rm docs/getEventCache.json
+rm docs/trackedPriceCache.json
+rm docs/analystLog.json
+
+# 백업 파일 삭제
+rm docs/trackedPriceCache.json.backup</code></pre>
+
+      <div class="note">
+        <strong>주의:</strong> <code>symbolCache.json</code>은 삭제하지 마세요.
+        이 파일은 모든 티커 유효성 검증의 기준이 되며, 재생성에 시간이 오래 걸립니다.
+      </div>
+    </section>
+
+    <section class="section-block">
       <h2 id="api-endpoints">API 엔드포인트 상세 설명</h2>
 
       <div class="endpoint">

@@ -6,6 +6,8 @@ import getValuation from './api/endpoints/getValuation.js';
 import refreshAnalystLog from './api/endpoints/refreshAnalystLog.js';
 import generateRating from './api/endpoints/generateRating.js';
 import apiGuide from './api/endpoints/apiGuide.js';
+import priceTrackerHandler from "./api/endpoints/priceTracker.js";
+import trackedPriceHandler from './api/endpoints/trackedPrice.js';
 import logger from './api/middleware/logger.js';
 import errorHandler from './api/middleware/errorHandler.js';
 import { initScheduler } from './services/scheduler.js';
@@ -14,6 +16,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+app.use(express.text({ type: "text/plain" }));
 app.use(logger);
 
 // Root endpoint - API Guide
@@ -30,6 +33,10 @@ app.get('/getEventLatest', getEventLatest);
 app.get('/getValuation', getValuation);
 app.get('/refreshAnalystLog', refreshAnalystLog);
 app.get('/generateRating', generateRating);
+
+// Price Tracker endpoints (Feature 002)
+app.post('/priceTracker', priceTrackerHandler);
+app.get('/trackedPrice', trackedPriceHandler);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

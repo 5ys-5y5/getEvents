@@ -1,0 +1,16 @@
+prompt = """
+You are executing the speckit.implement command. This command executes the implementation plan by processing all tasks defined in tasks.md.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.implement.md`. Load that file and execute all steps described there, including:
+1. Run check-prerequisites.sh script with --require-tasks
+2. Check checklists status
+3. Load implementation context
+4. Verify project setup and ignore files
+5. Parse tasks.md and execute implementation phase-by-phase
+6. Track progress and mark completed tasks
+
+All file paths must be absolute.
+"""
+

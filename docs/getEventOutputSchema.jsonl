@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "getEventOutputLine",
+  "description": "GET /getEvent 성공(HTTP 200) 시 반환되는 NDJSON 스트림의 각 라인(이벤트 레코드 또는 메타 레코드)에 대한 최소 스키마입니다. 4xx/5xx 에러 응답은 application/json 형식의 단일 에러 객체를 사용하며, 이 스키마의 적용 대상이 아닙니다.",
+  "oneOf": [
+    { "$ref": "#/definitions/eventRecord" },
+    { "$ref": "#/definitions/metaRecord" }
+  ],
+  "definitions": {
+    "eventRecord": {
+      "title": "getEvent",
+      "type": "object",
+      "description": "단일 이벤트 레코드.",
+      "required": ["ticker", "date", "source"],
+      "properties": {
+        "ticker": { "type": "string", "description": "종목 티커 심볼 (예: \"AAPL\"). symbolCache 및 각 provider의 symbol 필드를 기준으로 매핑된 값." },
+        "date":   { "type": "string", "format": "date", "description": "이벤트 발생 날짜 (YYYY-MM-DD). docs/ApiList.json 의 getEvent 서비스에서 fieldMap으로 매핑된 이벤트 날짜 필드 값이며, 요청한 startDate~endDate 범위 안에 있어야 한다." },
+        "source": { "type": "string", "description": "데이터 출처 서비스 id" }
+      },
+      "additionalProperties": false
+    },
+
+    "metaRecord": {
+      "title": "meta",
+      "type": "object",
+      "description": "모든 이벤트 레코드 출력 후 마지막 라인으로 추가되는 메타 레코드.",
+      "required": ["type", "getEvent_generated_at", "collectionErrorChecklist"],
+      "properties": {
+        "type": { "type": "string", "enum": ["meta"], "description": "이 레코드가 메타 레코드임을 나타내는 고정 값 \"meta\"." },
+        "getEvent_generated_at": { "type": "string", "format": "date-time", "description": "이 수집/응답 번들을 서버에서 생성한 시각(UTC, ISO 8601). 예: \"2025-11-19T11:54:51Z\"" },
+        "collectionErrorChecklist": { "type": "object", "description": "docs/ApiList.json 의 getEvent 하위 모든 service 호출에 대한 성공/실패 요약 정보.", "required": ["function", "status"],
+          "properties": {
+            "function": { "type": "string", "description": "해당 체크리스트가 속한 함수 이름. getEvent의 경우 \"getEvent\" 로 고정." },
+            "status": { "type": "array", "description": "각 service 호출 결과 요약 리스트.", 
+              "items": { "type": "object", "required": ["id", "success", "statusCode", "errorMessage"],
+                "properties": {
+                  "id": { "type": "string", "description": "어떤 수집 엔드포인트인지 식별하는 ID입니다. docs/ApiList.json의 각 service 노드에 정의된 id 값(예: \"fmp-company-screener\", \"fmp-earnings-calendar\")을 그대로 사용하며, symbolCache 관련 상태의 경우 docs/symbolCache.json.meta.sources[*].id 값과도 일치해야 합니다." },
+                  "success": { "type": "boolean", "description": "해당 service 호출 성공 여부." },
+                  "statusCode": { "type": "integer", "description": "HTTP 상태 코드 (예: 200, 500 등)." },
+                  "errorMessage": { "type": ["string", "null"], "description": "에러 메시지. 성공인 경우 null 또는 빈 문자열 허용." }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

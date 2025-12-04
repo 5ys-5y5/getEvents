@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: getEvent API
+  description: |
+    Returns financial events (earnings calendar, etc.) within a specified date range.
+    Events are filtered to only include tickers registered in symbolCache.json.
+  version: 1.0.0
+  contact:
+    name: Financial Event API Support
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /getEvent:
+    get:
+      summary: Get financial events within date range
+      description: |
+        Retrieves financial events (earnings calendar, etc.) for tickers in symbolCache.json
+        that fall within the specified date range. Returns NDJSON stream with event records
+        followed by a final meta record.
+
+        The date range is calculated from today (UTC):
+        - startDate: Number of days from today (minimum 1)
+        - endDate: Number of days from today (minimum 1)
+
+        Constraint: startDate must be less than or equal to endDate.
+
+        Upon successful completion (HTTP 200), the same content is cached to docs/getEventCache.json.
+      operationId: getEvent
+      tags:
+        - Events
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          description: |
+            Start date offset in days from today (UTC). Must be a positive integer >= 1.
+            Example: startDate=3 means "today + 3 days"
+          schema:
+            type: integer
+            minimum: 1
+          example: 3
+
+        - name: endDate
+          in: query
+          required: true
+          description: |
+            End date offset in days from today (UTC). Must be a positive integer >= 1 and >= startDate.
+            Example: endDate=7 means "today + 7 days"
+          schema:
+            type: integer
+            minimum: 1
+          example: 7
+
+      responses:
+        '200':
+          description: |
+            Success. Returns NDJSON (Newline Delimited JSON) stream.
+            Each line is either an eventRecord or a metaRecord (final line only).
+          content:
+            application/x-ndjson:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/EventRecord'
+                  - $ref: '#/components/schemas/MetaRecord'
+              examples:
+                successfulResponse:
+                  summary: Successful event collection
+                  value: |
+                    {"ticker":"AAPL","date":"2025-11-28","source":"fmp-earnings-calendar"}
+                    {"ticker":"MSFT","date":"2025-11-30","source":"fmp-earnings-calendar"}
+                    {"ticker":"GOOGL","date":"2025-12-01","source":"fmp-earnings-calendar"}
+                    {"type":"meta","getEvent_generated_at":"2025-11-25T10:30:00Z","collectionErrorChecklist":{"function":"getEvent","status":[{"id":"fmp-earnings-calendar","success":true,"statusCode":200,"errorMessage":null}]}}
+
+                partialFailure:
+                  summary: Partial API failure recorded in meta
+                  value: |
+                    {"ticker":"AAPL","date":"2025-11-28","source":"fmp-earnings-calendar"}
+                    {"type":"meta","getEvent_generated_at":"2025-11-25T10:30:00Z","collectionErrorChecklist":{"function":"getEvent","status":[{"id":"fmp-earnings-calendar","success":true,"statusCode":200,"errorMessage":null},{"id":"fmp-company-screener","success":false,"statusCode":500,"errorMessage":"API timeout"}]}}
+
+        '400':
+          description: |
+            Bad Request. Invalid date range parameters.
+            Reasons:
+            - startDate or endDate is not a positive integer
+            - startDate > endDate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidDateRange:
+                  summary: startDate greater than endDate
+                  value:
+                    error: "Invalid date range"
+                    message: "startDate must be less than or equal to endDate"
+                    code: "INVALID_DATE_RANGE"
+
+                invalidParameter:
+                  summary: Non-integer parameter
+                  value:
+                    error: "Invalid parameter"
+                    message: "startDate and endDate must be positive integers >= 1"
+                    code: "INVALID_PARAMETER"
+
+        '500':
+          description: |
+            Internal Server Error. All critical services (e.g., earnings-calendar) failed.
+            No NDJSON stream is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                allServicesFailed:
+                  summary: All critical services failed
+                  value:
+                    error: "Service unavailable"
+                    message: "All critical event collection services failed"
+                    code: "ALL_SERVICES_FAILED"
+
+components:
+  schemas:
+    EventRecord:
+      type: object
+      description: |
+        Single event record representing a financial event for a specific ticker on a specific date.
+        Only tickers present in docs/symbolCache.json are included.
+      required:
+        - ticker
+        - date
+        - source
+      properties:
+        ticker:
+          type: string
+          description: Stock ticker symbol (e.g., "AAPL")
+          example: "AAPL"
+
+        date:
+          type: string
+          format: date
+          description: Event date in YYYY-MM-DD format (within requested startDate~endDate range)
+          example: "2025-11-28"
+
+        source:
+          type: string
+          description: Data source service ID from ApiList.json
+          example: "fmp-earnings-calendar"
+
+      additionalProperties: false
+
+    MetaRecord:
+      type: object
+      description: |
+        Metadata record that appears as the final line in NDJSON stream.
+        Contains execution timestamp and collection error checklist.
+      required:
+        - type
+        - getEvent_generated_at
+        - collectionErrorChecklist
+      properties:
+        type:
+          type: string
+          enum: [meta]
+          description: Fixed value "meta" to identify this as metadata record
+          example: "meta"
+
+        getEvent_generated_at:
+          type: string
+          format: date-time
+          description: UTC timestamp when this response was generated (ISO 8601)
+          example: "2025-11-25T10:30:00Z"
+
+        collectionErrorChecklist:
+          type: object
+          description: Summary of all service call results from ApiList.json getEvent services
+          required:
+            - function
+            - status
+          properties:
+            function:
+              type: string
+              description: Function name (fixed as "getEvent")
+              example: "getEvent"
+
+            status:
+              type: array
+              description: List of service call results
+              items:
+                type: object
+                required:
+                  - id
+                  - success
+                  - statusCode
+                  - errorMessage
+                properties:
+                  id:
+                    type: string
+                    description: Service ID from ApiList.json (e.g., "fmp-earnings-calendar")
+                    example: "fmp-earnings-calendar"
+
+                  success:
+                    type: boolean
+                    description: Whether the service call succeeded
+                    example: true
+
+                  statusCode:
+                    type: integer
+                    description: HTTP status code from the service call
+                    example: 200
+
+                  errorMessage:
+                    type: string
+                    nullable: true
+                    description: Error message if failed, null or empty if successful
+                    example: null
+
+      additionalProperties: false
+
+    ErrorResponse:
+      type: object
+      description: Standard error response for 4xx and 5xx errors
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          description: Short error title
+          example: "Invalid date range"
+
+        message:
+          type: string
+          description: Detailed error message
+          example: "startDate must be less than or equal to endDate"
+
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "INVALID_DATE_RANGE"

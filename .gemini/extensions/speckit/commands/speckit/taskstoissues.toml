@@ -1,0 +1,15 @@
+prompt = """
+You are executing the speckit.taskstoissues command. This command converts existing tasks into actionable GitHub issues.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.taskstoissues.md`. Load that file and execute all steps described there, including:
+1. Run check-prerequisites.sh script
+2. Extract tasks path
+3. Get Git remote URL
+4. Verify GitHub repository
+5. Create GitHub issues for each task
+
+ONLY proceed if remote is a GitHub URL.
+"""
+

@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: Analyst Log Refresh API
+  description: |
+    Refresh analyst rating data from FMP API with checkpoint-based fault tolerance.
+    Supports resume from last successful batch (100 records per checkpoint).
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /refreshAnalystLog:
+    post:
+      summary: Refresh analyst rating data with checkpointing
+      description: |
+        Fetches analyst rating records from FMP API in batches of 100.
+        Checkpoints progress to analystLog.json after each batch for fault tolerance.
+        Automatically resumes from lastProcessedId if interrupted.
+      operationId: refreshAnalystLog
+      tags:
+        - Data Refresh
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Refresh completed successfully (full or resumed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+              examples:
+                fullRefresh:
+                  summary: Completed full refresh
+                  value:
+                    status: completed
+                    meta:
+                      startedAt: '2025-11-28T10:00:00Z'
+                      completedAt: '2025-11-28T12:30:00Z'
+                      totalRecords: 600000
+                      lastProcessedId: analyst_600000
+                      checkpointCount: 6000
+                      resumedFrom: null
+                    stats:
+                      recordsProcessed: 600000
+                      errorsEncountered: 12
+                      apiCallsMade: 6000
+                      durationSeconds: 9000
+                resumedRefresh:
+                  summary: Resumed from checkpoint
+                  value:
+                    status: completed
+                    meta:
+                      startedAt: '2025-11-28T10:00:00Z'
+                      completedAt: '2025-11-28T10:45:00Z'
+                      totalRecords: 600000
+                      lastProcessedId: analyst_600000
+                      checkpointCount: 6000
+                      resumedFrom: analyst_250000
+                    stats:
+                      recordsProcessed: 350000
+                      errorsEncountered: 5
+                      apiCallsMade: 3500
+                      durationSeconds: 2700
+        '401':
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingApiKey:
+                  summary: Missing X-API-Key header
+                  value:
+                    error:
+                      message: API key required
+                      code: MISSING_API_KEY
+        '500':
+          description: Internal Server Error - Refresh process failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                fmpApiError:
+                  summary: FMP API failure
+                  value:
+                    error:
+                      message: FMP API connection timeout
+                      code: FMP_API_ERROR
+                      details:
+                        lastCheckpoint: analyst_250000
+                        recordsProcessed: 250000
+                lockError:
+                  summary: File lock acquisition failed
+                  value:
+                    error:
+                      message: Failed to acquire lock on analystLog.json
+                      code: LOCK_ACQUISITION_ERROR
+                      details:
+                        retries: 3
+                        timeout: 500
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (currently uses same value as FMP API key)
+
+  schemas:
+    RefreshResponse:
+      type: object
+      required:
+        - status
+        - meta
+        - stats
+      properties:
+        status:
+          type: string
+          enum: [completed, partial]
+          description: |
+            Refresh completion status:
+            - completed: All records processed successfully
+            - partial: Some errors occurred but checkpoints saved
+        meta:
+          $ref: '#/components/schemas/RefreshMetadata'
+        stats:
+          $ref: '#/components/schemas/RefreshStats'
+
+    RefreshMetadata:
+      type: object
+      required:
+        - startedAt
+        - completedAt
+        - totalRecords
+        - lastProcessedId
+        - checkpointCount
+        - resumedFrom
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+          description: Refresh process start timestamp (ISO 8601, UTC)
+          example: '2025-11-28T10:00:00Z'
+        completedAt:
+          type: string
+          format: date-time
+          description: Refresh process completion timestamp (ISO 8601, UTC)
+          example: '2025-11-28T12:30:00Z'
+        totalRecords:
+          type: integer
+          minimum: 0
+          description: Total analyst records processed (including resumed)
+          example: 600000
+        lastProcessedId:
+          type: string
+          pattern: '^analyst_\d+$'
+          description: ID of last successfully processed record
+          example: analyst_600000
+        checkpointCount:
+          type: integer
+          minimum: 0
+          description: Number of checkpoints created (each 100 records)
+          example: 6000
+        resumedFrom:
+          type: string
+          pattern: '^analyst_\d+$'
+          nullable: true
+          description: Starting checkpoint ID if resumed (null for fresh start)
+          example: analyst_250000
+
+    RefreshStats:
+      type: object
+      required:
+        - recordsProcessed
+        - errorsEncountered
+        - apiCallsMade
+        - durationSeconds
+      properties:
+        recordsProcessed:
+          type: integer
+          minimum: 0
+          description: Number of records processed in this run
+          example: 600000
+        errorsEncountered:
+          type: integer
+          minimum: 0
+          description: Number of errors during refresh (logged to analystLog.json)
+          example: 12
+        apiCallsMade:
+          type: integer
+          minimum: 0
+          description: Total FMP API calls made
+          example: 6000
+        durationSeconds:
+          type: integer
+          minimum: 0
+          description: Total refresh duration in seconds
+          example: 9000
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - code
+          properties:
+            message:
+              type: string
+              description: Human-readable error description
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - MISSING_API_KEY
+                - FMP_API_ERROR
+                - LOCK_ACQUISITION_ERROR
+                - CHECKPOINT_WRITE_ERROR
+            details:
+              type: object
+              description: Additional error context
+              properties:
+                lastCheckpoint:
+                  type: string
+                  pattern: '^analyst_\d+$'
+                  description: Last successful checkpoint before error
+                recordsProcessed:
+                  type: integer
+                  minimum: 0
+                  description: Records processed before failure
+                retries:
+                  type: integer
+                  description: Number of retry attempts
+                timeout:
+                  type: integer
+                  description: Timeout duration in milliseconds

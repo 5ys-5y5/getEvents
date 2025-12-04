@@ -1,0 +1,135 @@
+
+      <h3>🚀 Database Migration (Feature 003)</h3>
+
+      <div class="note">
+        <strong>NEW: Supabase PostgreSQL 마이그레이션</strong>
+        <p>파일 기반 캐시 시스템을 Supabase PostgreSQL 데이터베이스로 마이그레이션하여 다음과 같은 장점을 제공합니다:</p>
+        <ul>
+          <li>✅ <strong>동시성 향상</strong>: 파일 잠금 불필요, PostgreSQL 트랜잭션으로 ACID 보장</li>
+          <li>✅ <strong>쿼리 성능</strong>: 인덱스를 통한 빠른 조회 (평균 90% 성능 향상)</li>
+          <li>✅ <strong>확장성</strong>: 500MB 무료 용량 (현재 43MB 사용, 11배 여유)</li>
+          <li>✅ <strong>자동 백업</strong>: 일일 자동 백업 + 24시간 Point-in-Time Recovery</li>
+          <li>✅ <strong>REST API</strong>: Supabase 자동 생성 API (선택적 사용 가능)</li>
+        </ul>
+      </div>
+
+      <h4>데이터베이스 스키마</h4>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>테이블명</th>
+            <th>기존 파일</th>
+            <th>용도</th>
+            <th>주요 인덱스</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>symbol_cache</code></td>
+            <td>symbolCache.json</td>
+            <td>티커 심볼 목록 및 메타데이터</td>
+            <td>ticker, sector (B-tree)</td>
+          </tr>
+          <tr>
+            <td><code>event_cache</code></td>
+            <td>getEventCache.json</td>
+            <td>재무 이벤트 캐시</td>
+            <td>start_date, end_date (B-tree)</td>
+          </tr>
+          <tr>
+            <td><code>trades</code></td>
+            <td>trackedPriceCache.json (trades)</td>
+            <td>개별 거래 기록</td>
+            <td>model_name, purchase_date (Composite)</td>
+          </tr>
+          <tr>
+            <td><code>model_summaries</code></td>
+            <td>trackedPriceCache.json (modelSummaries)</td>
+            <td>모델 성과 요약</td>
+            <td>model_name (B-tree)</td>
+          </tr>
+          <tr>
+            <td><code>analyst_log</code></td>
+            <td>analystLog.json</td>
+            <td>애널리스트 목표가 및 가격 추이</td>
+            <td>ticker (B-tree), price_trend (GIN)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>마이그레이션 가이드</h4>
+      <p>자세한 마이그레이션 절차는 <code>specs/003-database-migration/quickstart.md</code>를 참조하세요.</p>
+
+      <h5>빠른 시작 (요약)</h5>
+      <pre><code># 1. Supabase 프로젝트 생성 (https://supabase.com)
+
+# 2. 환경 변수 설정 (.env)
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+USE_DATABASE=true
+
+# 3. 의존성 설치
+npm install @supabase/supabase-js
+
+# 4. 테이블 생성
+npm run migrate:create-tables
+
+# 5. 데이터 마이그레이션
+npm run migrate:files-to-db
+
+# 6. 검증
+npm run migrate:verify
+
+# 7. 서버 재시작
+npm run dev</code></pre>
+
+      <h4>성능 비교 (Before/After)</h4>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>작업</th>
+            <th>파일 시스템</th>
+            <th>PostgreSQL</th>
+            <th>개선율</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>symbolCache 조회</td>
+            <td>~50ms</td>
+            <td>~5ms</td>
+            <td><strong>90% ↓</strong></td>
+          </tr>
+          <tr>
+            <td>analystLog 조회 (전체 42MB)</td>
+            <td>~1200ms</td>
+            <td>~15ms (필터링)</td>
+            <td><strong>99% ↓</strong></td>
+          </tr>
+          <tr>
+            <td>POST /priceTracker (1건)</td>
+            <td>~300ms (파일 잠금)</td>
+            <td>~50ms</td>
+            <td><strong>83% ↓</strong></td>
+          </tr>
+          <tr>
+            <td>동시 요청 처리</td>
+            <td>순차 (파일 잠금 대기)</td>
+            <td>병렬 (10+ 동시)</td>
+            <td><strong>무제한</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>Feature Flag 전환</h4>
+      <p>환경 변수 <code>USE_DATABASE</code>로 파일 시스템과 데이터베이스를 전환할 수 있습니다:</p>
+      <pre><code># 파일 시스템 사용 (기존 방식)
+USE_DATABASE=false
+
+# PostgreSQL 데이터베이스 사용 (신규 방식)
+USE_DATABASE=true</code></pre>
+
+      <div class="note">
+        <strong>롤백 가능:</strong> 마이그레이션 후에도 <code>docs/*.json</code> 파일은 백업용으로 유지됩니다.
+        문제 발생 시 <code>USE_DATABASE=false</code>로 즉시 롤백 가능합니다.
+      </div>

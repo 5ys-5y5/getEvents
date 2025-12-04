@@ -1,0 +1,15 @@
+prompt = """
+You are executing the speckit.checklist command. This command generates a custom checklist for the current feature based on user requirements.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.checklist.md`. Load that file and execute all steps described there, including:
+1. Run check-prerequisites.sh script
+2. Clarify intent with up to THREE contextual questions
+3. Understand user request and load feature context
+4. Generate checklist following the "Unit Tests for Requirements" principle
+5. Structure checklist using the template format
+
+All file paths must be absolute.
+"""
+

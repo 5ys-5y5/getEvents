@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: getEventLatest API
+  description: |
+    Returns the most recently cached event data from the last successful getEvent call.
+    Read-only endpoint that serves content from docs/getEventCache.json without triggering
+    new data collection.
+  version: 1.0.0
+  contact:
+    name: Financial Event API Support
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /getEventLatest:
+    get:
+      summary: Get latest cached event data
+      description: |
+        Retrieves the cached results from the most recent successful getEvent call.
+        Returns JSON format (not NDJSON) with meta object and events array.
+
+        This is a fast, read-only operation that does not trigger API calls to external services.
+        The cache file docs/getEventCache.json is created/updated by the getEvent endpoint.
+
+        If the cache file does not exist, returns HTTP 404 (user should call getEvent first).
+        If the cache file exists but cannot be parsed, returns HTTP 503 (file corrupted).
+      operationId: getEventLatest
+      tags:
+        - Events
+      parameters: []
+
+      responses:
+        '200':
+          description: |
+            Success. Returns cached event data in JSON format.
+            Structure: { "meta": {...}, "events": [...] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CachedEventResponse'
+              examples:
+                successfulCache:
+                  summary: Successfully retrieved cached events
+                  value:
+                    meta:
+                      type: "meta"
+                      getEvent_generated_at: "2025-11-25T10:30:00Z"
+                      request:
+                        startDate: 3
+                        endDate: 7
+                      collectionErrorChecklist:
+                        function: "getEvent"
+                        status:
+                          - id: "fmp-earnings-calendar"
+                            success: true
+                            statusCode: 200
+                            errorMessage: null
+                    events:
+                      - ticker: "AAPL"
+                        date: "2025-11-28"
+                        source: "fmp-earnings-calendar"
+                      - ticker: "MSFT"
+                        date: "2025-11-30"
+                        source: "fmp-earnings-calendar"
+                      - ticker: "GOOGL"
+                        date: "2025-12-01"
+                        source: "fmp-earnings-calendar"
+
+        '404':
+          description: |
+            Not Found. Cache file does not exist.
+            User needs to call GET /getEvent first to create the cache.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cacheNotFound:
+                  summary: Cache file not found
+                  value:
+                    error: "Cache not found"
+                    message: "Event cache file does not exist. Please call GET /getEvent first to create the cache."
+                    code: "GET_EVENT_CACHE_NOT_AVAILABLE"
+
+        '503':
+          description: |
+            Service Unavailable. Cache file exists but cannot be parsed (corrupted).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cacheParseError:
+                  summary: Cache file corrupted
+                  value:
+                    error: "Cache parse error"
+                    message: "Event cache file exists but cannot be parsed. File may be corrupted."
+                    code: "CACHE_PARSE_ERROR"
+
+components:
+  schemas:
+    CachedEventResponse:
+      type: object
+      description: |
+        Cached event data from the last successful getEvent call.
+        Structure mirrors the NDJSON output of getEvent but in JSON format.
+      required:
+        - meta
+        - events
+      properties:
+        meta:
+          $ref: '#/components/schemas/CachedMetaRecord'
+
+        events:
+          type: array
+          description: Array of event records from the cached collection
+          items:
+            $ref: '#/components/schemas/EventRecord'
+
+    CachedMetaRecord:
+      type: object
+      description: |
+        Metadata from the cached getEvent execution, including the original request parameters.
+      required:
+        - type
+        - getEvent_generated_at
+        - collectionErrorChecklist
+      properties:
+        type:
+          type: string
+          enum: [meta]
+          description: Fixed value "meta"
+          example: "meta"
+
+        getEvent_generated_at:
+          type: string
+          format: date-time
+          description: UTC timestamp when the cached data was generated
+          example: "2025-11-25T10:30:00Z"
+
+        request:
+          type: object
+          description: Original request parameters used in the cached getEvent call
+          properties:
+            startDate:
+              type: integer
+              description: Original startDate parameter
+              example: 3
+
+            endDate:
+              type: integer
+              description: Original endDate parameter
+              example: 7
+
+        collectionErrorChecklist:
+          type: object
+          description: Service call results from the cached execution
+          required:
+            - function
+            - status
+          properties:
+            function:
+              type: string
+              description: Function name (fixed as "getEvent")
+              example: "getEvent"
+
+            status:
+              type: array
+              description: List of service call results
+              items:
+                type: object
+                required:
+                  - id
+                  - success
+                  - statusCode
+                  - errorMessage
+                properties:
+                  id:
+                    type: string
+                    description: Service ID from ApiList.json
+                    example: "fmp-earnings-calendar"
+
+                  success:
+                    type: boolean
+                    description: Whether the service call succeeded
+                    example: true
+
+                  statusCode:
+                    type: integer
+                    description: HTTP status code
+                    example: 200
+
+                  errorMessage:
+                    type: string
+                    nullable: true
+                    description: Error message if failed, null if successful
+                    example: null
+
+    EventRecord:
+      type: object
+      description: Single event record from the cache
+      required:
+        - ticker
+        - date
+        - source
+      properties:
+        ticker:
+          type: string
+          description: Stock ticker symbol
+          example: "AAPL"
+
+        date:
+          type: string
+          format: date
+          description: Event date in YYYY-MM-DD format
+          example: "2025-11-28"
+
+        source:
+          type: string
+          description: Data source service ID
+          example: "fmp-earnings-calendar"
+
+      additionalProperties: false
+
+    ErrorResponse:
+      type: object
+      description: Standard error response
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          description: Short error title
+          example: "Cache not found"
+
+        message:
+          type: string
+          description: Detailed error message
+          example: "Event cache file does not exist. Please call GET /getEvent first to create the cache."
+
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "GET_EVENT_CACHE_NOT_AVAILABLE"

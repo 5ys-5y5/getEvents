@@ -1,0 +1,14 @@
+prompt = """
+You are executing the speckit.tasks command. This command generates an actionable, dependency-ordered tasks.md for the feature.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.tasks.md`. Load that file and execute all steps described there, including:
+1. Run check-prerequisites.sh script
+2. Load design documents (plan.md, spec.md, data-model.md, contracts/, research.md, quickstart.md)
+3. Execute task generation workflow
+4. Generate tasks.md following the template structure
+
+All file paths must be absolute.
+"""
+

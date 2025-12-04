@@ -1,0 +1,15 @@
+prompt = """
+You are executing the speckit.clarify command. This command identifies underspecified areas in the current feature spec by asking targeted clarification questions.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.clarify.md`. Load that file and execute all steps described there, including:
+1. Run check-prerequisites.sh script
+2. Load current spec file and perform ambiguity scan
+3. Generate prioritized clarification questions (max 5)
+4. Sequential questioning loop with incremental spec updates
+5. Validate and write updated spec
+
+All file paths must be absolute.
+"""
+

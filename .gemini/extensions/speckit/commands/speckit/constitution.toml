@@ -1,0 +1,16 @@
+prompt = """
+You are executing the speckit.constitution command. This command creates or updates the project constitution from interactive or provided principle inputs.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.constitution.md`. Load that file and execute all steps described there, including:
+1. Load existing constitution template
+2. Collect/derive values for placeholders
+3. Draft updated constitution content
+4. Consistency propagation checklist
+5. Produce sync impact report
+6. Validate and write completed constitution
+
+All file paths must be absolute.
+"""
+

@@ -1,0 +1,5 @@
+{
+  "name": "speckit",
+  "version": "1.0.0",
+  "description": "Spec-Driven Development workflow commands for Gemini CLI"
+}

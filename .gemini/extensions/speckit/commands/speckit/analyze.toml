@@ -1,0 +1,15 @@
+prompt = """
+You are executing the speckit.analyze command. This command performs a non-destructive cross-artifact consistency and quality analysis.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.analyze.md`. Load that file and execute all steps described there, including:
+1. Initialize analysis context
+2. Load artifacts (spec.md, plan.md, tasks.md, constitution.md)
+3. Build semantic models
+4. Run detection passes (duplication, ambiguity, underspecification, constitution alignment, coverage gaps, inconsistency)
+5. Assign severity and produce analysis report
+
+This is a READ-ONLY analysis. Do not modify files.
+"""
+

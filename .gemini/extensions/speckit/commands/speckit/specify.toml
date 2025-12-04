@@ -1,0 +1,16 @@
+prompt = """
+You are executing the speckit.specify command. This command creates or updates a feature specification from a natural language feature description.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.specify.md`. Load that file and execute all steps described there, including:
+1. Generate branch name and check for existing branches
+2. Run the create-new-feature.sh script
+3. Load the spec template
+4. Generate the specification following the template structure
+5. Validate specification quality
+6. Create requirements checklist
+
+All file paths must be absolute. For single quotes in args, use escape syntax.
+"""
+

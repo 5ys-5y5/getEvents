@@ -1,0 +1,211 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "getValuationResponse",
+  "description": "GET /getValuation 성공(HTTP 200) 시 반환되는 JSON 본문 스키마.",
+  "type": "object",
+  "required": ["meta", "valuations"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "description": "가치 평가 실행에 대한 메타데이터.",
+      "required": ["type", "getValuation_generated_at"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["meta"],
+          "description": "이 객체가 메타 정보임을 나타내는 고정 값 \"meta\"."
+        },
+        "getValuation_generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "가치 평가 결과를 서버에서 생성한 시각(UTC, ISO 8601)."
+        },
+        "request": {
+          "type": "object",
+          "description": "클라이언트가 getValuation 호출 시 전달한 파라미터 스냅샷.",
+          "required": ["tickers"],
+          "properties": {
+            "tickers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "요청에 포함된 티커 목록."
+            },
+            "cache": {
+              "type": "boolean",
+              "description": "쿼리 파라미터 cache 의 값. true 인 경우 getEvent 캐시 갱신을 시도했음을 의미한다."
+            }
+          },
+          "additionalProperties": false
+        },
+        "collectionErrorChecklist": {
+          "type": "object",
+          "description": "getValuation 실행 중 내부적으로 호출한 각 서비스에 대한 성공/실패 요약 정보.",
+          "required": ["function", "status"],
+          "properties": {
+            "function": {
+              "type": "string",
+              "enum": ["getValuation"],
+              "description": "해당 체크리스트가 속한 함수 이름(여기서는 \"getValuation\"으로 고정)."
+            },
+            "status": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "success"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "docs/ApiList.json 에 정의된 service.id."
+                  },
+                  "success": {
+                    "type": "boolean",
+                    "description": "true 이면 호출 성공, false 이면 실패."
+                  },
+                  "statusCode": {
+                    "type": "integer",
+                    "description": "HTTP 상태 코드 (예: 200, 500 등)."
+                  },
+                  "errorMessage": {
+                    "type": ["string", "null"],
+                    "description": "에러 메시지. 성공인 경우 null 또는 빈 문자열 허용."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "valuations": {
+      "type": "array",
+      "description": "티커별 가치 평가 결과 리스트.",
+      "items": { "$ref": "#/definitions/valuationRecord" }
+    }
+  },
+  "definitions": {
+    "valuationRecord": {
+      "type": "object",
+      "required": ["ticker"],
+      "properties": {
+        "ticker": {
+          "type": "string",
+          "description": "종목 티커 심볼."
+        },
+        "quantitive": {
+          "type": "object",
+          "description": "docs/evMethod.json.metrics.getQuantitiveValuation 에 정의된 정량 지표 결과(PBR, PSR, PER, ROE 등).",
+          "additionalProperties": {
+            "type": ["number", "null"],
+            "description": "각 정량 지표 값. 계산 불가 시 null."
+          }
+        },
+
+        "qualitative": {
+          "type": "object",
+          "description": "docs/evMethod.json.metrics.getQualativeValuation 에 정의된 정성 지표 결과 및 일부 패스-스루 요약 정보.",
+          "properties": {
+            "ConsensusTargetPrice": {
+              "type": ["number", "null"],
+              "description": "컨센서스 조정 목표가(avgAdjPriceTarget)."
+            },
+            "PriceTargetSummary": {
+              "type": ["object", "null"],
+              "description": "ApiList[\"getQualativeValuation\"][\"getEachPriceTargetConsensusSummary\"] (fmp-price-target-summary) 호출 결과를 각 ticker 당 하나의 객체로 노출한다. FMP 응답 형식을 그대로 따른다.",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "description": "티커 심볼 (FMP 응답의 symbol). 예: \"RGTI\""
+                },
+                "lastMonthCount": {
+                  "type": ["integer", "null"],
+                  "description": "지난 한 달 동안 집계된 price target 레코드 수."
+                },
+                "lastMonthAvgPriceTarget": {
+                  "type": ["number", "null"],
+                  "description": "지난 한 달 동안의 price target 평균 값."
+                },
+                "lastQuarterCount": {
+                  "type": ["integer", "null"],
+                  "description": "지난 분기(최근 3개월) 동안 집계된 price target 레코드 수."
+                },
+                "lastQuarterAvgPriceTarget": {
+                  "type": ["number", "null"],
+                  "description": "지난 분기(최근 3개월) 동안의 price target 평균 값."
+                },
+                "lastYearCount": {
+                  "type": ["integer", "null"],
+                  "description": "지난 1년 동안 집계된 price target 레코드 수."
+                },
+                "lastYearAvgPriceTarget": {
+                  "type": ["number", "null"],
+                  "description": "지난 1년 동안의 price target 평균 값."
+                },
+                "allTimeCount": {
+                  "type": ["integer", "null"],
+                  "description": "전체 기간(all time) 기준 price target 레코드 수."
+                },
+                "allTimeAvgPriceTarget": {
+                  "type": ["number", "null"],
+                  "description": "전체 기간(all time) 기준 price target 평균 값."
+                },
+                "publishers": {
+                  "type": ["string", "null"],
+                  "description": "해당 요약에 사용된 newsPublisher 목록을 JSON 문자열로 직렬화한 값. 예: \"[\\\"TheFly\\\",\\\"StreetInsider\\\"]\""
+                }
+              },
+              "required": [
+                "symbol",
+                "lastMonthCount",
+                "lastMonthAvgPriceTarget",
+                "lastQuarterCount",
+                "lastQuarterAvgPriceTarget",
+                "lastYearCount",
+                "lastYearAvgPriceTarget",
+                "allTimeCount",
+                "allTimeAvgPriceTarget",
+                "publishers"
+              ],
+              "additionalProperties": false
+            },
+            
+            "analystRating": {
+              "type": "object",
+              "description": "ratingAnalyst 결과 요약 (애널리스트별 D+N 괴리율 통계 등). 세부 구조는 향후 확장 가능.",
+              "additionalProperties": true
+            },
+            "EachPriceTargetConsensusWithRating": {
+              "type": "array",
+              "description": "consensusWithAnalystRating 출력. 애널리스트별 priceTarget + D+N 괴리율 통계.",
+              "items": {
+                "type": "object",
+                "required": ["symbol", "publishedDate", "analystName", "priceTarget"],
+                "properties": {
+                  "symbol": { "type": "string" },
+                  "publishedDate": { "type": "string", "format": "date-time" },
+                  "newsURL": { "type": ["string", "null"] },
+                  "newsTitle": { "type": ["string", "null"] },
+                  "analystName": { "type": "string" },
+                  "priceTarget": { "type": ["number", "null"] },
+                  "adjPriceTarget": { "type": ["number", "null"] },
+                  "priceWhenPosted": { "type": ["number", "null"] },
+                  "newsPublisher": { "type": ["string", "null"] },
+                  "newsBaseURL": { "type": ["string", "null"] },
+                  "analystCompany": { "type": ["string", "null"] }
+                },
+                "additionalProperties": {
+                  "type": ["number", "null"],
+                  "description": "D+0AVGGapRate, D+0deviation, ..., D+365AVGGapRate, D+365deviation 등 D+N 통계 필드."
+                }
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

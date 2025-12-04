@@ -1,0 +1,15 @@
+    <!-- Price Tracker API Documentation added by implementation -->
+    <section class="section-block">
+      <h2 id="price-tracker-api">Price Tracker API (Feature 002)</h2>
+      <p class="section-intro">
+        개별 거래의 D+1~D+14 가격 추적 및 모델 성과 분석을 제공하는 API입니다.
+        상세 문서는 docs/priceTracker-api-documentation.md를 참조하세요.
+      </p>
+      <div class="note">
+        <strong>새로운 엔드포인트:</strong>
+        <ul>
+          <li><strong>POST /priceTracker</strong>: 거래 추적 등록 (배치 처리)</li>
+          <li><strong>GET /trackedPrice</strong>: 거래 조회 및 모델 성과 요약</li>
+        </ul>
+      </div>
+    </section>

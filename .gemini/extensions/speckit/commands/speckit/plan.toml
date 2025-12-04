@@ -1,0 +1,14 @@
+prompt = """
+You are executing the speckit.plan command. This command executes the implementation planning workflow using the plan template to generate design artifacts.
+
+User input: {{args}}
+
+Follow the complete workflow defined in `.claude/commands/speckit.plan.md`. Load that file and execute all steps described there, including:
+1. Run setup-plan.sh script
+2. Load context from FEATURE_SPEC and constitution.md
+3. Execute plan workflow phases (Phase 0: Research, Phase 1: Design & Contracts)
+4. Update agent context
+
+All file paths must be absolute.
+"""
+

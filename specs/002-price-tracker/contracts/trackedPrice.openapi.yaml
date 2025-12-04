@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: Tracked Price Cache API
+  description: |
+    Retrieve all cached trades and model-level performance summaries including
+    suggested cap percentiles (maxCap/lowCap) for take-profit/stop-loss thresholds.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /trackedPrice:
+    get:
+      summary: Get all cached trades and model summaries
+      description: |
+        Returns the complete trackedPriceCache contents including all trades
+        and aggregated model performance metrics. Model summaries include
+        suggested cap percentiles calculated from at least 3 completed returns.
+      operationId: getTrackedPrices
+      tags:
+        - Cache Retrieval
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Successful retrieval of cached data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackedPriceCache'
+              examples:
+                withModelSummaries:
+                  summary: Cache with multiple models and trades
+                  value:
+                    meta:
+                      lastUpdatedAt: '2025-11-28T10:30:00Z'
+                      totalTrades: 487
+                      totalModels: 5
+                      cacheVersion: '1.0.0'
+                    trades:
+                      - position: long
+                        modelName: MODEL-0
+                        ticker: AAPL
+                        purchaseDate: '2025-11-01'
+                        currentPrice: 150.25
+                        priceHistory:
+                          - targetDate: '2025-11-04'
+                            actualDate: '2025-11-04'
+                            open: 151.00
+                            high: 153.50
+                            low: 150.75
+                            close: 152.25
+                          - targetDate: '2025-11-05'
+                            actualDate: '2025-11-05'
+                            open: 152.00
+                            high: 154.00
+                            low: 151.50
+                            close: 153.50
+                        returns:
+                          - date: '2025-11-04'
+                            returnRate: 0.0133
+                            returnSource: close
+                            cumulativeReturn: 0.0133
+                          - date: '2025-11-05'
+                            returnRate: 0.0216
+                            returnSource: close
+                            cumulativeReturn: 0.0351
+                        meta:
+                          createdAt: '2025-11-01T09:30:00Z'
+                          updatedAt: '2025-11-05T16:00:00Z'
+                          missingDates: []
+                          errors: []
+                    modelSummaries:
+                      - modelName: MODEL-0
+                        tradeCount: 150
+                        suggestedMaxCap: 0.0215
+                        suggestedLowCap: -0.0187
+                        avgReturn: 0.0052
+                        winRate: 0.63
+                      - modelName: MODEL-1
+                        tradeCount: 2
+                        suggestedMaxCap: null
+                        suggestedLowCap: null
+                        avgReturn: 0.0023
+                        winRate: 0.50
+        '401':
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingApiKey:
+                  summary: Missing X-API-Key header
+                  value:
+                    error:
+                      message: API key required
+                      code: MISSING_API_KEY
+        '500':
+          description: Internal Server Error - Cache read failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cacheReadError:
+                  summary: Failed to read cache file
+                  value:
+                    error:
+                      message: Failed to read trackedPriceCache.json
+                      code: CACHE_READ_ERROR
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (currently uses same value as FMP API key)
+
+  schemas:
+    TrackedPriceCache:
+      type: object
+      required:
+        - meta
+        - trades
+        - modelSummaries
+      properties:
+        meta:
+          $ref: '#/components/schemas/CacheMeta'
+        trades:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeRecord'
+        modelSummaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelSummary'
+
+    CacheMeta:
+      type: object
+      required:
+        - lastUpdatedAt
+        - totalTrades
+        - totalModels
+        - cacheVersion
+      properties:
+        lastUpdatedAt:
+          type: string
+          format: date-time
+          description: Last cache update timestamp (ISO 8601, UTC)
+          example: '2025-11-28T10:30:00Z'
+        totalTrades:
+          type: integer
+          minimum: 0
+          description: Total number of trades in cache
+          example: 487
+        totalModels:
+          type: integer
+          minimum: 0
+          description: Number of unique models
+          example: 5
+        cacheVersion:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          description: Schema version (semantic versioning)
+          example: '1.0.0'
+
+    TradeRecord:
+      type: object
+      required:
+        - position
+        - modelName
+        - ticker
+        - purchaseDate
+        - currentPrice
+        - priceHistory
+        - returns
+        - meta
+      properties:
+        position:
+          type: string
+          enum: [long, short]
+          description: Trading direction
+        modelName:
+          type: string
+          pattern: '^MODEL-\d+$'
+          example: MODEL-0
+          description: Model identifier
+        ticker:
+          type: string
+          pattern: '^[A-Z]+$'
+          example: AAPL
+          description: Stock symbol (uppercase)
+        purchaseDate:
+          type: string
+          format: date
+          example: '2025-11-01'
+          description: Trade entry date (YYYY-MM-DD, UTC)
+        currentPrice:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          example: 150.25
+          description: Purchase date open price
+        priceHistory:
+          type: array
+          minItems: 14
+          maxItems: 14
+          items:
+            $ref: '#/components/schemas/PriceHistory'
+          description: OHLC data for D+1 to D+14
+        returns:
+          type: array
+          minItems: 14
+          maxItems: 14
+          items:
+            $ref: '#/components/schemas/ReturnRecord'
+          description: Position-specific returns for D+1 to D+14
+        meta:
+          $ref: '#/components/schemas/TradeMetadata'
+
+    PriceHistory:
+      type: object
+      required:
+        - targetDate
+      properties:
+        targetDate:
+          type: string
+          format: date
+          description: Intended D+N date
+        actualDate:
+          type: string
+          format: date
+          nullable: true
+          description: Actual trading day used (null if future)
+        open:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Opening price (null if future)
+        high:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Intraday high (null if future)
+        low:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Intraday low (null if future)
+        close:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: Closing price (null if future)
+
+    ReturnRecord:
+      type: object
+      required:
+        - date
+      properties:
+        date:
+          type: string
+          format: date
+          description: Return calculation date
+        returnRate:
+          type: number
+          format: double
+          nullable: true
+          description: Daily return rate (null if future)
+        returnSource:
+          type: string
+          enum: [close, open_maxCap, open_lowCap]
+          nullable: true
+          description: |
+            Price type used for calculation:
+            - close: Normal case (caps not hit)
+            - open_maxCap: Intraday high/low hit profit threshold
+            - open_lowCap: Intraday high/low hit stop-loss threshold
+        cumulativeReturn:
+          type: number
+          format: double
+          nullable: true
+          description: Cumulative return from purchase date (null if future)
+
+    TradeMetadata:
+      type: object
+      required:
+        - createdAt
+        - updatedAt
+        - missingDates
+        - errors
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: Trade creation timestamp (ISO 8601, UTC)
+          example: '2025-11-01T09:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp (ISO 8601, UTC)
+          example: '2025-11-05T16:00:00Z'
+        missingDates:
+          type: array
+          items:
+            type: string
+            format: date
+          description: D+N dates with no trading day within 7 days
+          example: []
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              message:
+                type: string
+              code:
+                type: string
+          description: Collection errors encountered
+          example: []
+
+    ModelSummary:
+      type: object
+      required:
+        - modelName
+        - tradeCount
+        - suggestedMaxCap
+        - suggestedLowCap
+        - avgReturn
+        - winRate
+      properties:
+        modelName:
+          type: string
+          pattern: '^MODEL-\d+$'
+          example: MODEL-0
+          description: Model identifier
+        tradeCount:
+          type: integer
+          minimum: 0
+          description: Total trades for this model
+          example: 150
+        suggestedMaxCap:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            20th percentile of all returns (take-profit threshold).
+            Null if tradeCount < 3 or insufficient completed returns.
+          example: 0.0215
+        suggestedLowCap:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            5th percentile of all returns (stop-loss threshold).
+            Null if tradeCount < 3 or insufficient completed returns.
+          example: -0.0187
+        avgReturn:
+          type: number
+          format: double
+          nullable: true
+          description: Mean of all completed returns (null if no returns)
+          example: 0.0052
+        winRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: Proportion of positive returns (null if no returns)
+          example: 0.63
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - code
+          properties:
+            message:
+              type: string
+              description: Human-readable error description
+            code:
+              type: string
+              description: Machine-readable error code
